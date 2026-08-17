@@ -1,0 +1,122 @@
+[
+  {
+    "page_id": "VAL-OQ-108-P01",
+    "doc_id": "VAL-OQ-108",
+    "page_number": 1,
+    "doc_title": "Waters Empower 3 CDS Operational Qualification Protocol",
+    "section_title": "Scope, System Topography, and 21 CFR Part 11 Regulatory Predicates",
+    "doc_type": "Validation Protocol",
+    "system": "Empower CDS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["Header Block", "Topography Diagram", "Regulatory Predicate Table"],
+    "content": "Protocol Scope: Operational Qualification for Waters Empower 3 Chromatography Data System in QC Release Laboratory. Outlines system topography, client-server network nodes, database clustering, and compliance with 21 CFR Part 11 and EU GMP Annex 11 predicates for electronic data management."
+  },
+  {
+    "page_id": "VAL-OQ-108-P02",
+    "doc_id": "VAL-OQ-108",
+    "page_number": 2,
+    "doc_title": "Waters Empower 3 CDS Operational Qualification Protocol",
+    "section_title": "User Access Privilege Tier and Role-Based Authorization Matrix",
+    "doc_type": "Validation Protocol",
+    "system": "Empower CDS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["Security Matrix Table", "Privilege Tier Checklist", "Sign-Off Form"],
+    "content": "Operational Test Script 2.1: Verification of Role-Based Access Control (RBAC). Verifies strict segregation of duties between System Administrator, Method Developer, QC Analyst, and QA Auditor. Confirms analysts cannot modify integration baselines or alter audit log capture rules."
+  },
+  {
+    "page_id": "VAL-OQ-108-P03",
+    "doc_id": "VAL-OQ-108",
+    "page_number": 3,
+    "doc_title": "Waters Empower 3 CDS Operational Qualification Protocol",
+    "section_title": "Chromatographic Peak Integration Algorithm Verification Table",
+    "doc_type": "Validation Protocol",
+    "system": "Empower CDS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["Chromatogram Peak Table", "Apex Algorithm Spec", "Relative Standard Deviation (RSD) Formula"],
+    "content": "Operational Test Script 3.4: Automated Peak Integration and Baseline Resolution Verification. Injects test reference standards to challenge automated tangent skim, peak shoulder detection, and baseline drift algorithms. Acceptance criteria requires retention time repeatability RSD < 0.50% across 6 replicates."
+  },
+  {
+    "page_id": "VAL-OQ-108-P04",
+    "doc_id": "VAL-OQ-108",
+    "page_number": 4,
+    "doc_title": "Waters Empower 3 CDS Operational Qualification Protocol",
+    "section_title": "Raw Data Archiving, Checksum Integrity, and Audit Trail Deletion Resistance",
+    "doc_type": "Validation Protocol",
+    "system": "Empower CDS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["Audit Trail Verification Step Table", "SHA-256 Checksum Block", "Failure Challenge Script"],
+    "content": "Operational Test Script 4.2: Data Integrity and Immutable Audit Trail Challenge. Tests system resistance to manual file deletion in raw spectral data repository. Challenges time-stamped audit trail logging upon chromatographic sequence abort, instrument re-calibration, or sample reprocessing."
+  },
+  {
+    "page_id": "DEV-2024-031-P01",
+    "doc_id": "DEV-2024-031",
+    "page_number": 1,
+    "doc_title": "Deviation Investigation: Bioreactor DO Sensor Logging Dropout",
+    "section_title": "Incident Summary, Batch Details, and Initial Containment",
+    "doc_type": "Deviation",
+    "system": "DeltaV SCADA / MES",
+    "gamp_category": "Category 5",
+    "layout_elements": ["Incident Header", "Batch Production Timeline", "Initial Containment Sign-Off"],
+    "content": "Incident Description: Intermittent communication dropout between bioreactor dissolved oxygen (DO) probe transmitters and Emerson DeltaV SCADA server during commercial batch fermentation run #B-2024-09. DO readings flatlined for 14 minutes during peak oxygen uptake phase."
+  },
+  {
+    "page_id": "DEV-2024-031-P02",
+    "doc_id": "DEV-2024-031",
+    "page_number": 2,
+    "doc_title": "Deviation Investigation: Bioreactor DO Sensor Logging Dropout",
+    "section_title": "Ishikawa Root Cause Fishbone Diagram and Modbus Protocol Diagnostics",
+    "doc_type": "Deviation",
+    "system": "DeltaV SCADA / MES",
+    "gamp_category": "Category 5",
+    "layout_elements": ["Fishbone Diagram", "Modbus Communication Log", "5-Whys Diagnostic Table"],
+    "content": "Root Cause Analysis: Detailed Modbus TCP/IP packet inspection identified buffer overrun in Ethernet-to-RS485 gateway transceiver module when high polling frequency (100ms) collided with broadcast storm on manufacturing VLAN segment."
+  },
+  {
+    "page_id": "DEV-2024-031-P03",
+    "doc_id": "DEV-2024-031",
+    "page_number": 3,
+    "doc_title": "Deviation Investigation: Bioreactor DO Sensor Logging Dropout",
+    "section_title": "Critical Quality Attribute (CQA) Impact Assessment and Corrective Actions",
+    "doc_type": "Deviation",
+    "system": "DeltaV SCADA / MES",
+    "gamp_category": "Category 5",
+    "layout_elements": ["CQA Risk Table", "Product Quality Disposition", "CAPA Cross-Reference"],
+    "content": "Product Quality Impact: Offline metabolite sampling confirmed dissolved oxygen remained above critical threshold of 30% air saturation throughout dropout window. No impact to monoclonal antibody glycosylation profile. CAPA initiated for gateway firmware upgrade."
+  },
+  {
+    "page_id": "SRA-GAMP-012-P01",
+    "doc_id": "SRA-GAMP-012",
+    "page_number": 1,
+    "doc_title": "GAMP 5 Category 4 Cloud EDMS System Risk Assessment",
+    "section_title": "FMEA Methodology, Regulatory Scope, and Hazard Identification",
+    "doc_type": "Risk Assessment",
+    "system": "Documentum EDMS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["FMEA Scope Table", "Severity Criteria Matrix", "GxP Impact Tree"],
+    "content": "System Risk Assessment: Failure Mode and Effects Analysis (FMEA) for cloud-hosted Electronic Document Management System supporting IND/NDA regulatory submissions. Evaluates patient safety, product quality, and data integrity risk across document authoring and approval lifecycles."
+  },
+  {
+    "page_id": "SRA-GAMP-012-P02",
+    "doc_id": "SRA-GAMP-012",
+    "page_number": 2,
+    "doc_title": "GAMP 5 Category 4 Cloud EDMS System Risk Assessment",
+    "section_title": "Severity, Occurrence, Detectability (SOD) Scoring Matrix for Electronic Signatures",
+    "doc_type": "Risk Assessment",
+    "system": "Documentum EDMS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["Risk Priority Number (RPN) Table", "Mitigation Control Matrix", "Quality Review Signatures"],
+    "content": "Failure Mode 04: Compromise of dual-factor electronic signature private key. Severity = Critical (9), Occurrence = Low (2), Detectability = High (2), RPN = 36. Mitigation: Enforce cryptographic HSM key storage, PKI digital certificate revocation lists, and automated session invalidation."
+  },
+  {
+    "page_id": "CAPA-2023-019-P01",
+    "doc_id": "CAPA-2023-019",
+    "page_number": 1,
+    "doc_title": "CAPA Plan: Automated Database Backup Remediation in LIMS",
+    "section_title": "Root Cause, Corrective Actions, and Quarterly Disaster Recovery Drills",
+    "doc_type": "CAPA",
+    "system": "LabVantage LIMS",
+    "gamp_category": "Category 4",
+    "layout_elements": ["Action Plan Table", "RTO/RPO Metrics Block", "Effectiveness Check Schedule"],
+    "content": "CAPA Execution Plan: Addresses automated Oracle RMAN snapshot failures. Implements S3 cross-region replication, automated SHA-256 backup archive checksum verification, RTO < 4 hours, RPO < 15 minutes, and mandatory quarterly mock disaster recovery restoration drills."
+  }
+]

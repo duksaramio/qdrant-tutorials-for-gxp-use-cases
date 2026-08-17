@@ -1,168 +1,105 @@
-# Semantic Search 101 for Life Science Quality & Computer System Validation (CSV)
+# Tutorial 01: Semantic Search 101 for Life Science Quality and CSV
 
-| Time: 5 - 15 min | Level: Beginner | Domain: Life Sciences / CSV / GxP Quality |
+| Time: 15–20 min | Level: Beginner | Infrastructure: Local Qdrant (`http://localhost:6333`) + Local Ollama (`qwen3-embedding:8b`) |
 | :--- | :--- | :--- |
 
 ## Overview
 
-In Life Sciences and regulated GxP environments, Quality Assurance (QA) and Computer System Validation (CSV) teams navigate thousands of controlled documents:
+In Life Sciences and Computer System Validation (CSV), Quality and Validation engineers manage thousands of controlled documents:
 - **Standard Operating Procedures (SOPs)**
-- **User Requirements Specifications (URS)**
-- **Validation Protocols (IQ/OQ/PQ)**
+- **Validation Protocols & Reports (IQ / OQ / PQ / VSR)**
 - **Deviation Investigations (DEV)**
-- **Corrective and Preventive Actions (CAPA)**
-- **Change Controls (CC)**
+- **Corrective and Preventive Actions (CAPAs)**
+- **Change Controls (CC / CR)**
+- **System Risk Assessments (SRA / FMEA)**
 
-Traditional keyword search fails when terminology varies (e.g., searching for *"unauthorized electronic record changes"* will miss an SOP titled *"21 CFR Part 11 Audit Trail Review and E-Signature Security Controls"*).
+Traditional keyword search fails when queries use colloquial phrasing or synonyms (e.g., searching for *"unauthorized modification of electronic batch records"* fails to retrieve documents titled *"21 CFR Part 11 Audit Trail Review and E-Signature Controls"*).
 
-In this 5-minute tutorial, you will build a semantic search engine to index GxP quality and CSV records, perform semantic queries across validation artifacts, and narrow down search results using metadata filters.
-
----
-
-## 1. Create a Qdrant Cluster
-
-If using Qdrant Cloud:
-1. Register for a [Qdrant Cloud account](https://cloud.qdrant.io/).
-2. Under **Create a Free Cluster**, select your preferred cloud provider and region.
-3. Copy the **Cluster Endpoint** and **API Key**.
-
-Alternatively, this tutorial supports **zero-setup local execution** using Qdrant's in-memory engine and FastEmbed.
+This tutorial demonstrates how to build a high-performance **Semantic Vector Search Engine** tailored for GxP documents using **Qdrant** and local **Ollama (`qwen3-embedding:8b`)** embeddings (4096-dimensional vectors).
 
 ---
 
-## 2. Set up the Client Connection
+## 🎯 What You Will Learn
 
-Install the client:
+1. **Local Setup:** Connect to local Qdrant server (`http://localhost:6333`) and local Ollama (`http://localhost:11434`).
+2. **Collection Setup:** Create a collection configured with 4096-dimensional cosine distance vectors.
+3. **Payload Engineering:** Upload GxP documents with structured metadata (`doc_type`, `system`, `effective_year`, `gamp_category`, `regulatory_predicates`).
+4. **Embedding Generation:** Embed documents and queries using local `qwen3-embedding:8b` via Ollama.
+5. **Semantic Retrieval:** Execute natural language queries capturing complex regulatory concepts.
+6. **Payload Filtering:** Filter search results using structured metadata constraints.
+
+---
+
+## ⚙️ Prerequisites & Installation
+
+Make sure your local Qdrant server and Ollama are running:
 ```bash
-pip install qdrant-client fastembed python-dotenv
+# 1. Start Qdrant Docker container
+docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
+
+# 2. Verify Ollama has qwen3-embedding:8b
+ollama list
 ```
 
-Connect to Qdrant:
+Install Python dependencies:
+```bash
+pip install qdrant-client ollama python-dotenv tabulate
+```
+
+---
+
+## 💻 Code Example
+
 ```python
 from qdrant_client import QdrantClient, models
+import ollama
 
-# For Qdrant Cloud:
-client = QdrantClient(
-    url="https://xyz-example.cloud.qdrant.io",
-    api_key="your-api-key",
-    cloud_inference=True
-)
+client = QdrantClient("http://localhost:6333")
+ollama_client = ollama.Client(host="http://localhost:11434")
 
-# Or for local in-memory execution:
-# client = QdrantClient(":memory:")
-```
-
----
-
-## 3. Create a Collection
-
-```python
-COLLECTION_NAME = "gxp_quality_docs"
-
+# 1. Create collection with 4096 dimensions
 client.create_collection(
-    collection_name=COLLECTION_NAME,
-    vectors_config=models.VectorParams(
-        size=384,
-        distance=models.Distance.COSINE,
-    ),
+    collection_name="gxp_quality_docs",
+    vectors_config=models.VectorParams(size=4096, distance=models.Distance.COSINE),
 )
-```
 
----
+# 2. Embed and upload document
+text = "SOP-QA-042: Establishes 21 CFR Part 11 and EU Annex 11 audit trail review procedures."
+embedding = ollama_client.embed(model="qwen3-embedding:8b", input=[text]).embeddings[0]
 
-## 4. Upload Data to the Cluster
-
-The dataset contains realistic GxP documents from `data/gxp_quality_docs.json`:
-
-```python
-import json
-from pathlib import Path
-
-with open("../../data/gxp_quality_docs.json", "r") as f:
-    documents = json.load(f)
-
-EMBEDDING_MODEL = "sentence-transformers/all-minilm-l6-v2"
-
-# When using Qdrant Cloud with Cloud Inference:
 client.upload_points(
-    collection_name=COLLECTION_NAME,
+    collection_name="gxp_quality_docs",
     points=[
         models.PointStruct(
-            id=idx,
-            vector=models.Document(
-                text=doc["description"],
-                model=EMBEDDING_MODEL
-            ),
-            payload=doc
+            id=1,
+            vector=embedding,
+            payload={
+                "doc_id": "SOP-QA-042",
+                "doc_type": "SOP",
+                "system": "Enterprise QMS",
+                "effective_year": 2024,
+            },
         )
-        for idx, doc in enumerate(documents)
     ],
 )
-```
 
----
+# 3. Query with semantic vector + metadata filter
+q_vec = ollama_client.embed(model="qwen3-embedding:8b", input=["audit trail review requirements"]).embeddings[0]
 
-## 5. Query the Engine
-
-### Semantic Query (Without Exact Keywords)
-Search for concepts rather than exact keywords:
-
-```python
-hits = client.query_points(
-    collection_name=COLLECTION_NAME,
-    query=models.Document(
-        text="unauthorized modification of electronic batch records and missing audit trails",
-        model=EMBEDDING_MODEL
+results = client.query_points(
+    collection_name="gxp_quality_docs",
+    query=q_vec,
+    query_filter=models.Filter(
+        must=[models.FieldCondition(key="doc_type", match=models.MatchValue(value="SOP"))]
     ),
     limit=3,
-).points
-
-for hit in hits:
-    print(f"[{hit.payload['doc_id']}] {hit.payload['title']} (Score: {hit.score:.4f})")
-```
-
-### Narrow Down with Metadata Filters
-Create payload indexes and filter by document type and effective year:
-
-```python
-client.create_payload_index(
-    collection_name=COLLECTION_NAME,
-    field_name="doc_type",
-    field_schema=models.PayloadSchemaType.KEYWORD,
 )
-client.create_payload_index(
-    collection_name=COLLECTION_NAME,
-    field_name="effective_year",
-    field_schema=models.PayloadSchemaType.INTEGER,
-)
-
-hits = client.query_points(
-    collection_name=COLLECTION_NAME,
-    query=models.Document(
-        text="system hardware communication failure and instrument data interruption",
-        model=EMBEDDING_MODEL
-    ),
-    query_filter=models.Filter(
-        must=[
-            models.FieldCondition(
-                key="doc_type",
-                match=models.MatchAny(any=["CAPA", "Deviation"])
-            ),
-            models.FieldCondition(
-                key="effective_year",
-                range=models.Range(gte=2023)
-            )
-        ]
-    ),
-    limit=2,
-).points
 ```
 
 ---
 
-## Running the Sample Code
+## 🚀 Running the Tutorial
 
 ```bash
-# Run the complete Python script
 python tutorials/01_semantic_search_101/semantic_search_101_gxp.py
 ```

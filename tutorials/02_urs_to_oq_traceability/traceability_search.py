@@ -4,30 +4,52 @@ Tutorial 02: Automated URS-to-OQ Requirements Traceability Matrix (RTM) Search
 In Computer System Validation (CSV / GAMP 5), building and maintaining the Requirements
 Traceability Matrix (RTM) is a labor-intensive manual task.
 
-This script demonstrates how Qdrant semantic search matches User Requirements (URS)
-to corresponding Operational Qualification (OQ) test scripts automatically.
+This script demonstrates how Qdrant semantic search and local Ollama (qwen3-embedding:8b)
+automatically match User Requirements (URS) to corresponding Operational Qualification (OQ)
+verification test scripts.
+
+Target Environment: Local Qdrant (http://localhost:6333) + Local Ollama (http://localhost:11434)
 """
 
 import json
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding
+import ollama
 
-# ---------------------------------------------------------------------------
-# 1. Initialize In-Memory Qdrant Client & FastEmbed
-# ---------------------------------------------------------------------------
-print("=" * 75)
-print("Tutorial 02: Automated URS-to-OQ Requirements Traceability Search")
-print("=" * 75)
+load_dotenv()
 
-client = QdrantClient(":memory:")
-embedder = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "oq_test_scripts"
+
+# ---------------------------------------------------------------------------
+# 1. Initialize Qdrant Client & Ollama
+# ---------------------------------------------------------------------------
+print("=" * 75)
+print("Tutorial 02: Automated URS-to-OQ Traceability with Local Ollama & Qdrant")
+print(f"  - Qdrant:  {QDRANT_URL}")
+print(f"  - Ollama:  {OLLAMA_HOST} ({EMBEDDING_MODEL}, {VECTOR_SIZE} dims)")
+print("=" * 75)
+
+client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
+
+
+def get_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
+
+if client.collection_exists(COLLECTION_NAME):
+    client.delete_collection(COLLECTION_NAME)
 
 client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config=models.VectorParams(
-        size=384,
+        size=VECTOR_SIZE,
         distance=models.Distance.COSINE,
     ),
 )
@@ -49,11 +71,11 @@ oq_descriptions = [
     for t in oq_tests
 ]
 
-vectors = list(embedder.embed(oq_descriptions))
+vectors = get_embeddings(oq_descriptions)
 points = [
     models.PointStruct(
-        id=idx,
-        vector=vectors[idx].tolist(),
+        id=idx + 1,
+        vector=vectors[idx],
         payload=oq_tests[idx],
     )
     for idx in range(len(oq_tests))
@@ -79,7 +101,7 @@ for urs in urs_list:
     print(f"Requirement: \"{statement}\"")
     print("-" * 75)
 
-    query_vec = list(embedder.embed([statement]))[0].tolist()
+    query_vec = get_embeddings([statement])[0]
     hits = client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vec,
@@ -93,7 +115,7 @@ for urs in urs_list:
         module = test["module"]
         score = hit.score if hasattr(hit, "score") else 0.0
 
-        match_verdict = "CONFIRMED TRACE" if score > 0.45 else "POTENTIAL GAP"
+        match_verdict = "CONFIRMED TRACE" if score > 0.55 else "POTENTIAL GAP"
         print(f"  --> Match #{rank} [{match_verdict}] [Score: {score:.4f}]")
         print(f"      Test Script: {test_id} - {test_title} (Module: {module})")
         print(f"      Test Steps: {test['steps'][:100]}...")

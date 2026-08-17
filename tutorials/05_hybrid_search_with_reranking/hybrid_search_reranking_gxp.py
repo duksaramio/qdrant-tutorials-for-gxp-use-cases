@@ -3,11 +3,11 @@ Tutorial 05: Hybrid Search with Late-Interaction (ColBERT) Reranking for Life Sc
 
 Architecture:
 1. Ingestion:
-   - Dense Embeddings: sentence-transformers/all-MiniLM-L6-v2 (384-dim, semantic context)
-   - Sparse Embeddings: Qdrant/bm25 with IDF modifier (keyword/acronym/section matching)
-   - Late Interaction Multivectors: colbert-ir/colbertv2.0 (128-dim per token, MaxSim reranking)
+   - Dense Embeddings: Ollama qwen3-embedding:8b (4096-dim, deep semantic context)
+   - Sparse Embeddings: FastEmbed Qdrant/bm25 with IDF modifier (keyword/acronym/section matching)
+   - Late Interaction Multivectors: FastEmbed colbert-ir/colbertv2.0 (128-dim per token, MaxSim reranking)
 2. Retrieval:
-   - Prefetch candidate pool using Dense + BM25 Sparse search (high recall)
+   - Prefetch candidate pool using Dense (Ollama) + BM25 Sparse search (high recall)
    - Rerank prefetched candidates using ColBERT late interaction multi-vector (high precision)
 3. Target Environment: Local Qdrant server at http://localhost:6333
 """
@@ -17,28 +17,37 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding, SparseTextEmbedding, LateInteractionTextEmbedding
+from fastembed import SparseTextEmbedding, LateInteractionTextEmbedding
+import ollama
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_hybrid_reranking_docs"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant Server & Initialize FastEmbed Models
+# 1. Connect to Local Qdrant Server & Initialize Models
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-print("Initializing 3 embedding models locally via FastEmbed:")
-print("  [1] Dense:           sentence-transformers/all-MiniLM-L6-v2 (384 dims)")
-print("  [2] Sparse:          Qdrant/bm25 (IDF modifier enabled)")
-print("  [3] Late Interaction: colbert-ir/colbertv2.0 (128 dims/token, MaxSim)")
+print("Initializing 3 embedding models locally:")
+print(f"  [1] Dense:            Ollama {EMBEDDING_MODEL} ({VECTOR_SIZE} dims)")
+print("  [2] Sparse:           FastEmbed Qdrant/bm25 (IDF modifier enabled)")
+print("  [3] Late Interaction: FastEmbed colbert-ir/colbertv2.0 (128 dims/token, MaxSim)")
 
-dense_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 colbert_model = LateInteractionTextEmbedding(model_name="colbert-ir/colbertv2.0")
+
+
+def get_dense_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
 
 # ---------------------------------------------------------------------------
 # 2. Create Collection with Dense, Sparse, and Late-Interaction Vectors
@@ -53,7 +62,7 @@ client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config={
         "dense": models.VectorParams(
-            size=384,
+            size=VECTOR_SIZE,
             distance=models.Distance.COSINE,
         ),
         "multi": models.VectorParams(
@@ -83,7 +92,7 @@ with open(data_path, "r", encoding="utf-8") as f:
 
 texts = [f"{doc['title']}. {doc['description']}" for doc in documents]
 
-dense_embeddings = list(dense_model.embed(texts))
+dense_embeddings = get_dense_embeddings(texts)
 sparse_embeddings = list(sparse_model.embed(texts))
 colbert_embeddings = list(colbert_model.embed(texts))
 
@@ -94,7 +103,7 @@ for idx, doc in enumerate(documents):
         id=idx + 1,
         payload=doc,
         vector={
-            "dense": dense_embeddings[idx].tolist(),
+            "dense": dense_embeddings[idx],
             "sparse": models.SparseVector(
                 indices=s_vec.indices.tolist(),
                 values=s_vec.values.tolist(),
@@ -105,7 +114,7 @@ for idx, doc in enumerate(documents):
     points.append(point)
 
 client.upload_points(collection_name=COLLECTION_NAME, points=points)
-print(f"Successfully uploaded {len(points)} documents with Dense, BM25, and ColBERT vectors.")
+print(f"Successfully uploaded {len(points)} documents with Dense (Ollama), BM25, and ColBERT vectors.")
 
 # ---------------------------------------------------------------------------
 # 4. Pipeline Execution: Dense vs. BM25 vs. Hybrid RRF vs. Late Interaction Reranking
@@ -116,7 +125,7 @@ def run_retrieval_and_reranking(query_text: str):
     print("=" * 80)
 
     # Generate query vectors for all 3 models
-    q_dense = list(dense_model.embed([query_text]))[0].tolist()
+    q_dense = get_dense_embeddings([query_text])[0]
     q_sparse = list(sparse_model.embed([query_text]))[0]
     q_colbert = list(colbert_model.embed([query_text]))[0].tolist()
 
@@ -165,7 +174,7 @@ def run_retrieval_and_reranking(query_text: str):
         with_payload=True,
     ).points
 
-    print("\n[Stage 1: Dense Retrieval (Semantic Meaning)]")
+    print("\n[Stage 1: Dense Retrieval (Ollama Semantic Meaning)]")
     for r, h in enumerate(dense_res, 1):
         print(f"  #{r} [Score: {h.score:.4f}] {h.payload['doc_id']}: {h.payload['title']}")
 

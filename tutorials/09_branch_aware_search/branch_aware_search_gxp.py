@@ -11,7 +11,7 @@ An un-scoped vector search leaks across branches, returning superseded versions,
 or foreign branch modifications.
 
 This script demonstrates Qdrant's Branch-Aware Search architecture:
-1. Index document versions as immutable points with deterministic UUIDv5 IDs.
+1. Index document versions as immutable points with deterministic UUIDv5 IDs and Ollama embeddings.
 2. Track supersede and retirement events using an 'overwritten_in' nested payload schema.
 3. Construct branch visibility filters that traverse ancestry lineage with fork-point cutoffs.
 4. Execute point lookups and semantic vector searches scoped strictly to any branch's live view.
@@ -24,22 +24,25 @@ import uuid
 from typing import List, Tuple, Optional
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding
+import ollama
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_branch_aware_docs"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant & Initialize FastEmbed Model
+# 1. Connect to Local Qdrant & Initialize Ollama Client
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-print("Initializing FastEmbed dense model (sentence-transformers/all-MiniLM-L6-v2)...")
-dense_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+print(f"Initializing Ollama model '{EMBEDDING_MODEL}' ({VECTOR_SIZE} dims)...")
 
 # Deterministic namespace for reproducible point UUIDs
 NS = uuid.UUID("00000000-0000-0000-0000-000000000042")
@@ -48,6 +51,10 @@ NS = uuid.UUID("00000000-0000-0000-0000-000000000042")
 def point_id(branch: str, seq: int, path: str) -> str:
     """Generates a deterministic UUID based on branch name, commit seq, and document path."""
     return str(uuid.uuid5(NS, f"{branch}|{seq}|{path}"))
+
+
+def get_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +69,7 @@ if client.collection_exists(COLLECTION_NAME):
 client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config=models.VectorParams(
-        size=384,
+        size=VECTOR_SIZE,
         distance=models.Distance.COSINE,
     ),
 )
@@ -179,7 +186,7 @@ def update(file_name: str, branch: str, seq: int, content: str, ancestry: List[T
     if prev:
         supersede(prev, by=branch, seq=seq)
 
-    vec = list(dense_model.embed([content]))[0].tolist()
+    vec = get_embeddings([content])[0]
     client.upsert(
         collection_name=COLLECTION_NAME,
         points=[
@@ -208,7 +215,7 @@ def delete(file_name: str, branch: str, seq: int, ancestry: List[Tuple[str, int]
 
 def search(query: str, branch: str, ancestry: List[Tuple[str, int]], limit: int = 3):
     """Executes a semantic vector search scoped strictly to a branch's live view."""
-    q_vec = list(dense_model.embed([query]))[0].tolist()
+    q_vec = get_embeddings([query])[0]
     return client.query_points(
         collection_name=COLLECTION_NAME,
         query=q_vec,
@@ -222,7 +229,7 @@ def search(query: str, branch: str, ancestry: List[Tuple[str, int]], limit: int 
 # 5. Replay GxP Document Version History Across Branches
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 80)
-print("Step 3: Simulating GxP Document Commits & Branching...")
+print("Step 3: Simulating GxP Document Commits & Branching via Ollama...")
 
 # Lineage tracking
 root_ancestry = []  # 'main-effective' is the root baseline

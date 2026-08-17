@@ -6,31 +6,52 @@ must verify whether technical software controls satisfy specific predicate rule 
 (e.g., 21 CFR 11.10(e) time-stamped audit trails, 11.50 signature manifestations).
 
 This script demonstrates how to:
-1. Index regulatory predicate rules and guidance clauses in Qdrant.
-2. Query vendor technical specifications and architectural controls.
+1. Index regulatory predicate rules and guidance clauses in local Qdrant.
+2. Embed vendor technical specifications and architectural controls using Ollama (qwen3-embedding:8b).
 3. Automatically map vendor technical features to exact regulatory citations.
+
+Target Environment: Local Qdrant (http://localhost:6333) + Local Ollama (http://localhost:11434)
 """
 
 import json
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding
+import ollama
 
-# ---------------------------------------------------------------------------
-# 1. Initialize In-Memory Qdrant Client & FastEmbed
-# ---------------------------------------------------------------------------
-print("=" * 75)
-print("Tutorial 03: 21 CFR Part 11 & EU Annex 11 Regulatory Clause Mapping")
-print("=" * 75)
+load_dotenv()
 
-client = QdrantClient(":memory:")
-embedder = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "regulatory_clauses"
+
+# ---------------------------------------------------------------------------
+# 1. Initialize Qdrant Client & Ollama
+# ---------------------------------------------------------------------------
+print("=" * 75)
+print("Tutorial 03: Regulatory Clause Mapping with Local Ollama & Qdrant")
+print(f"  - Qdrant:  {QDRANT_URL}")
+print(f"  - Ollama:  {OLLAMA_HOST} ({EMBEDDING_MODEL}, {VECTOR_SIZE} dims)")
+print("=" * 75)
+
+client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
+
+
+def get_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
+
+if client.collection_exists(COLLECTION_NAME):
+    client.delete_collection(COLLECTION_NAME)
 
 client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config=models.VectorParams(
-        size=384,
+        size=VECTOR_SIZE,
         distance=models.Distance.COSINE,
     ),
 )
@@ -49,11 +70,11 @@ clause_texts = [
     for c in clauses
 ]
 
-vectors = list(embedder.embed(clause_texts))
+vectors = get_embeddings(clause_texts)
 points = [
     models.PointStruct(
-        id=idx,
-        vector=vectors[idx].tolist(),
+        id=idx + 1,
+        vector=vectors[idx],
         payload=clauses[idx],
     )
     for idx in range(len(clauses))
@@ -93,7 +114,7 @@ for feat in vendor_technical_features:
     print(f"Statement: \"{f_desc}\"")
     print("-" * 75)
 
-    query_vec = list(embedder.embed([f_desc]))[0].tolist()
+    query_vec = get_embeddings([f_desc])[0]
     hits = client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vec,

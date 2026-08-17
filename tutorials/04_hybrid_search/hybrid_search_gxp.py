@@ -2,8 +2,8 @@
 Tutorial 04: Hybrid Search for Life Science Quality & Computer System Validation (CSV)
 
 Combines:
-1. Dense Semantic Embeddings (sentence-transformers/all-MiniLM-L6-v2)
-2. Sparse Keyword Embeddings (Qdrant/bm25 with Server-Side IDF Modifier)
+1. Dense Semantic Embeddings via Local Ollama (qwen3-embedding:8b, 4096-dim)
+2. Sparse Keyword Embeddings via FastEmbed (Qdrant/bm25 with Server-Side IDF Modifier)
 3. Reciprocal Rank Fusion (RRF) to merge and rank results
 4. Regulatory & Metadata Filtering on GxP attributes
 
@@ -15,25 +15,35 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding, SparseTextEmbedding
+from fastembed import SparseTextEmbedding
+import ollama
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_hybrid_quality_docs"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant Server & Initialize FastEmbed Models
+# 1. Connect to Local Qdrant Server & Initialize Models
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-print("Initializing FastEmbed models locally:")
-print("  - Dense:  sentence-transformers/all-MiniLM-L6-v2 (384 dims)")
-print("  - Sparse: Qdrant/bm25 (lexical frequency + server-side IDF)")
-dense_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+print("Initializing models locally:")
+print(f"  - Dense:  Ollama {EMBEDDING_MODEL} ({VECTOR_SIZE} dims)")
+print("  - Sparse: FastEmbed Qdrant/bm25 (lexical frequency + server-side IDF)")
+
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+
+
+def get_dense_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
 
 # ---------------------------------------------------------------------------
 # 2. Create Collection with Named Dense & Sparse Vectors
@@ -48,7 +58,7 @@ client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config={
         "dense_vector": models.VectorParams(
-            size=384,
+            size=VECTOR_SIZE,
             distance=models.Distance.COSINE,
         )
     },
@@ -58,7 +68,7 @@ client.create_collection(
         )
     },
 )
-print(f"Collection '{COLLECTION_NAME}' created with dense_vector & bm25_sparse_vector.")
+print(f"Collection '{COLLECTION_NAME}' created with dense_vector ({VECTOR_SIZE}d) & bm25_sparse_vector.")
 
 # ---------------------------------------------------------------------------
 # 3. Ingest GxP Quality & CSV Documents
@@ -72,8 +82,8 @@ with open(data_path, "r", encoding="utf-8") as f:
 
 texts = [f"{doc['title']}. {doc['description']}" for doc in documents]
 
-print("Generating dense and BM25 sparse embeddings...")
-dense_embeddings = list(dense_model.embed(texts))
+print("Generating dense (Ollama) and BM25 sparse embeddings...")
+dense_embeddings = get_dense_embeddings(texts)
 sparse_embeddings = list(sparse_model.embed(texts))
 
 points = []
@@ -83,7 +93,7 @@ for idx, doc in enumerate(documents):
         id=idx + 1,
         payload=doc,
         vector={
-            "dense_vector": dense_embeddings[idx].tolist(),
+            "dense_vector": dense_embeddings[idx],
             "bm25_sparse_vector": models.SparseVector(
                 indices=s_vec.indices.tolist(),
                 values=s_vec.values.tolist(),
@@ -122,7 +132,7 @@ def run_comparison(query_text: str):
     print(f"QUERY: \"{query_text}\"")
     print("=" * 80)
 
-    q_dense = list(dense_model.embed([query_text]))[0].tolist()
+    q_dense = get_dense_embeddings([query_text])[0]
     q_sparse = list(sparse_model.embed([query_text]))[0]
     sparse_vector_obj = models.SparseVector(
         indices=q_sparse.indices.tolist(),
@@ -164,7 +174,7 @@ def run_comparison(query_text: str):
         limit=2,
     ).points
 
-    print("\n[A] DENSE ONLY (Semantic Match):")
+    print("\n[A] DENSE ONLY (Ollama qwen3-embedding:8b Semantic Match):")
     for r, h in enumerate(dense_hits, 1):
         print(f"  #{r} [Score: {h.score:.4f}] {h.payload['doc_id']}: {h.payload['title']}")
 
@@ -196,7 +206,7 @@ query_filtered = "database snapshot backup failures and recovery drills"
 print(f"Query: \"{query_filtered}\"")
 print("Filter: doc_type in ['CAPA', 'Deviation'] AND effective_year >= 2023")
 
-q_d = list(dense_model.embed([query_filtered]))[0].tolist()
+q_d = get_dense_embeddings([query_filtered])[0]
 q_s = list(sparse_model.embed([query_filtered]))[0]
 
 gxp_filter = models.Filter(

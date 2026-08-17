@@ -2,9 +2,9 @@
 Semantic Search 101 for Life Science Quality and Computer System Validation (CSV)
 
 This script demonstrates how to:
-1. Initialize a Qdrant client (Qdrant Cloud or Local In-Memory)
-2. Create a collection for GxP / CSV documents
-3. Upload documents with payloads and semantic vector embeddings
+1. Connect to local Qdrant server (http://localhost:6333) and local Ollama (qwen3-embedding:8b)
+2. Create a collection for GxP / CSV documents with 4096-dimensional dense vectors
+3. Upload documents with payloads and semantic vector embeddings from Ollama
 4. Run semantic queries to retrieve relevant validation protocols, SOPs, and CAPAs
 5. Apply payload filters (e.g. document type, effective year) to narrow search results
 """
@@ -14,44 +14,41 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding
+import ollama
 
-# Load environment variables if available
+# Load environment variables
 load_dotenv()
 
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-minilm-l6-v2")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_quality_docs"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Qdrant
+# 1. Connect to Qdrant & Ollama
 # ---------------------------------------------------------------------------
 print("=" * 70)
-print("Step 1 & 2: Connecting to Qdrant...")
+print("Step 1: Connecting to Qdrant & Ollama...")
+print(f"  - Qdrant Endpoint: {QDRANT_URL}")
+print(f"  - Ollama Host:     {OLLAMA_HOST}")
+print(f"  - Embedding Model: {EMBEDDING_MODEL} ({VECTOR_SIZE} dims)")
 
-if QDRANT_URL and QDRANT_API_KEY:
-    print(f"Connecting to Qdrant Cloud: {QDRANT_URL}")
-    client = QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
-        cloud_inference=True,
-    )
-    use_cloud_inference = True
-    embedder = None
-else:
-    print("No QDRANT_URL / QDRANT_API_KEY found in environment.")
-    print("Using local in-memory Qdrant with FastEmbed (sentence-transformers/all-MiniLM-L6-v2)...")
-    client = QdrantClient(":memory:")
-    use_cloud_inference = False
-    embedder = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
+
+
+def get_embeddings(texts: list) -> list:
+    """Generates dense embeddings via local Ollama qwen3-embedding:8b."""
+    response = ollama_client.embed(model=EMBEDDING_MODEL, input=texts)
+    return response.embeddings
 
 
 # ---------------------------------------------------------------------------
 # 2. Create Collection
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 70)
-print(f"Step 3: Creating collection '{COLLECTION_NAME}'...")
+print(f"Step 2: Creating collection '{COLLECTION_NAME}'...")
 
 if client.collection_exists(COLLECTION_NAME):
     client.delete_collection(COLLECTION_NAME)
@@ -59,7 +56,7 @@ if client.collection_exists(COLLECTION_NAME):
 client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config=models.VectorParams(
-        size=384,  # Dimensionality for all-minilm-l6-v2
+        size=VECTOR_SIZE,
         distance=models.Distance.COSINE,
     ),
 )
@@ -67,10 +64,10 @@ print(f"Collection '{COLLECTION_NAME}' created successfully.")
 
 
 # ---------------------------------------------------------------------------
-# 3. Load Sample GxP Documents
+# 3. Load and Ingest Sample GxP Documents
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 70)
-print("Step 4: Loading and uploading GxP / CSV documents...")
+print("Step 3: Loading and embedding GxP / CSV documents via Ollama...")
 
 data_path = Path(__file__).resolve().parent.parent.parent / "data" / "gxp_quality_docs.json"
 with open(data_path, "r", encoding="utf-8") as f:
@@ -78,31 +75,17 @@ with open(data_path, "r", encoding="utf-8") as f:
 
 print(f"Loaded {len(documents)} GxP documents from {data_path.name}")
 
-if use_cloud_inference:
-    # Qdrant Cloud handles model inference natively
-    points = [
-        models.PointStruct(
-            id=idx,
-            vector=models.Document(
-                text=doc["description"],
-                model=EMBEDDING_MODEL,
-            ),
-            payload=doc,
-        )
-        for idx, doc in enumerate(documents)
-    ]
-else:
-    # Local mode: compute vectors with fastembed
-    texts = [doc["description"] for doc in documents]
-    vectors = list(embedder.embed(texts))
-    points = [
-        models.PointStruct(
-            id=idx,
-            vector=vectors[idx].tolist(),
-            payload=doc,
-        )
-        for idx, doc in enumerate(documents)
-    ]
+texts = [f"{doc['title']}. {doc['description']}" for doc in documents]
+embeddings = get_embeddings(texts)
+
+points = [
+    models.PointStruct(
+        id=idx + 1,
+        vector=embeddings[idx],
+        payload=doc,
+    )
+    for idx, doc in enumerate(documents)
+]
 
 client.upload_points(collection_name=COLLECTION_NAME, points=points)
 print(f"Successfully indexed {len(documents)} documents into '{COLLECTION_NAME}'.")
@@ -112,7 +95,7 @@ print(f"Successfully indexed {len(documents)} documents into '{COLLECTION_NAME}'
 # 4. Create Payload Indexes for Filtering
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 70)
-print("Creating payload indexes for structured metadata filtering...")
+print("Step 4: Creating payload indexes for structured metadata filtering...")
 
 client.create_payload_index(
     collection_name=COLLECTION_NAME,
@@ -138,14 +121,11 @@ print("Payload indexes created on 'doc_type', 'effective_year', and 'system'.")
 # 5. Helper Function to Query
 # ---------------------------------------------------------------------------
 def run_search(query_text: str, query_filter: models.Filter = None, limit: int = 3):
-    if use_cloud_inference:
-        query_input = models.Document(text=query_text, model=EMBEDDING_MODEL)
-    else:
-        query_input = list(embedder.embed([query_text]))[0].tolist()
+    query_vector = get_embeddings([query_text])[0]
 
     return client.query_points(
         collection_name=COLLECTION_NAME,
-        query=query_input,
+        query=query_vector,
         query_filter=query_filter,
         limit=limit,
     ).points
@@ -190,7 +170,7 @@ print_results(query_2, hits_2)
 # 7. Narrow Down Results with Metadata Filters
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 70)
-print("Filtering Query Results: Only 'CAPA' or 'Deviation' from 2023 onwards...")
+print("Step 6: Filtering Query Results: Only 'CAPA' or 'Deviation' from 2023 onwards...")
 
 query_3 = "system hardware communication failure and instrument data interruption"
 gxp_filter = models.Filter(
@@ -210,4 +190,5 @@ hits_filtered = run_search(query_3, query_filter=gxp_filter, limit=3)
 print_results(f"{query_3}\n  [FILTER: doc_type in ['CAPA', 'Deviation'] & year >= 2023]", hits_filtered)
 
 print("=" * 70)
-print("Tutorial 101 Execution Complete!")
+print("Tutorial 01 Execution Complete!")
+print("=" * 70)

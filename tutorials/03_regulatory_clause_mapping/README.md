@@ -1,17 +1,28 @@
 # Tutorial 03: 21 CFR Part 11 & EU Annex 11 Regulatory Clause Mapping
 
-| Time: 10 min | Level: Beginner / Intermediate | Focus: 21 CFR Part 11 & GxP Compliance |
+| Time: 20–25 min | Level: Intermediate | Infrastructure: Local Qdrant (`http://localhost:6333`) + Local Ollama (`qwen3-embedding:8b`) |
 | :--- | :--- | :--- |
 
 ## Overview
-During Computer System Validation (CSV) vendor audits and computerized system periodic reviews, CSV and Quality leads must cross-reference technical software features against exact predicate rules in **FDA 21 CFR Part 11**, **EU GMP Annex 11**, and **GAMP 5**.
 
-This tutorial demonstrates how to:
-1. Index regulatory predicate rules and guidance clauses in Qdrant.
-2. Query vendor technical specifications and architectural controls.
-3. Automatically map vendor technical features to exact regulatory citations.
+In Life Sciences and Computer System Validation (CSV), Quality and Regulatory Affairs teams frequently review vendor documentation, System Architecture Documents (SAD), and Software Requirements Specifications (SRS) to assess compliance against predicate regulations:
+- **FDA 21 CFR Part 11** (Electronic Records; Electronic Signatures)
+- **EU GMP Annex 11** (Computerised Systems)
+- **GAMP 5 2nd Edition** (Risk-Based Approach to Compliant GxP Computerized Systems)
 
-## Run Tutorial
+This tutorial demonstrates how to use **Qdrant Vector Search** and local **Ollama (`qwen3-embedding:8b`)** embeddings (4096-dimensional vectors) to automatically map vendor software features to specific regulatory clauses.
+
+---
+
+## 🎯 What You Will Learn
+
+1. **Regulatory Indexing:** Vectorize predicate rules (21 CFR 11.10, 11.50, 11.70, EU Annex 11.7, 11.9).
+2. **Vendor Assessment:** Query vendor technical claims against the regulatory index.
+3. **Automated Citation:** Retrieve exact regulatory clauses and confidence scores for compliance gap analysis.
+
+---
+
+## 💻 Running the Tutorial
 
 ```bash
 python tutorials/03_regulatory_clause_mapping/part11_clause_mapping.py

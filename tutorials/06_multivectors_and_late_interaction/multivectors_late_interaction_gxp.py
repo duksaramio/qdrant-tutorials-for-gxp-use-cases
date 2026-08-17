@@ -8,7 +8,7 @@ technical clauses. Single-vector pooling loses token-level specifics.
 This script demonstrates how to:
 1. Configure a multi-vector collection in Qdrant with HNSW disabled for multivectors (m=0)
    to save RAM and optimize ingestion throughput.
-2. Ingest GxP quality documents with both dense (384d) and ColBERT multivectors (128d per token).
+2. Ingest GxP quality documents with both dense (Ollama qwen3-embedding:8b, 4096d) and ColBERT multivectors (128d per token).
 3. Execute single-call fast retrieval (dense ANN) + high-precision MaxSim late interaction reranking.
 4. Compare single-vector pooled retrieval vs. token-level late interaction scoring.
 
@@ -20,26 +20,35 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding, LateInteractionTextEmbedding
+from fastembed import LateInteractionTextEmbedding
+import ollama
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_multivectors_demo"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant & Initialize FastEmbed Models
+# 1. Connect to Local Qdrant & Initialize Models
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-print("Initializing embedding models via FastEmbed:")
-print("  - Dense (Single Vector):     sentence-transformers/all-MiniLM-L6-v2 (384 dims)")
-print("  - Late Interaction (Multi): colbert-ir/colbertv2.0 (128 dims/token, MaxSim)")
+print("Initializing embedding models:")
+print(f"  - Dense (Single Vector):     Ollama {EMBEDDING_MODEL} ({VECTOR_SIZE} dims)")
+print("  - Late Interaction (Multi): FastEmbed colbert-ir/colbertv2.0 (128 dims/token, MaxSim)")
 
-dense_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 colbert_model = LateInteractionTextEmbedding(model_name="colbert-ir/colbertv2.0")
+
+
+def get_dense_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
 
 # ---------------------------------------------------------------------------
 # 2. Create Optimized Multi-Vector Collection (HNSW m=0 for ColBERT)
@@ -54,7 +63,7 @@ client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config={
         "dense": models.VectorParams(
-            size=384,
+            size=VECTOR_SIZE,
             distance=models.Distance.COSINE,
             # HNSW is active by default for dense vectors (first-pass fast ANN retrieval)
         ),
@@ -82,7 +91,7 @@ with open(data_path, "r", encoding="utf-8") as f:
 
 texts = [f"{doc['title']}. {doc['description']}" for doc in documents]
 
-dense_embeddings = list(dense_model.embed(texts))
+dense_embeddings = get_dense_embeddings(texts)
 colbert_embeddings = list(colbert_model.embed(texts))
 
 points = []
@@ -92,7 +101,7 @@ for idx, doc in enumerate(documents):
         id=idx + 1,
         payload=doc,
         vector={
-            "dense": dense_embeddings[idx].tolist(),
+            "dense": dense_embeddings[idx],
             "colbert": c_vec.tolist(),
         },
     )
@@ -123,7 +132,7 @@ def compare_single_vs_multivector(query_text: str):
     print(f"USER QUERY: \"{query_text}\"")
     print("=" * 80)
 
-    q_dense = list(dense_model.embed([query_text]))[0].tolist()
+    q_dense = get_dense_embeddings([query_text])[0]
     q_colbert = list(colbert_model.embed([query_text]))[0].tolist()
 
     # 1. Single Vector Dense Retrieval (Early Interaction / Pooled)
@@ -148,7 +157,7 @@ def compare_single_vs_multivector(query_text: str):
         with_payload=True,
     ).points
 
-    print("\n[Method A: Single-Vector Dense Search (Early Interaction Pooling)]")
+    print("\n[Method A: Single-Vector Dense Search (Ollama Early Interaction Pooling)]")
     for r, h in enumerate(dense_hits, 1):
         print(f"  #{r} [Cosine Score: {h.score:.4f}] {h.payload['doc_id']}: {h.payload['title']}")
 
@@ -177,7 +186,7 @@ print("FILTERED MULTIVECTOR RESCORING (CAPA / Deviations from 2023+)")
 print("=" * 80)
 
 query_filtered = "communication dropout between sensor probe and SCADA server"
-q_d = list(dense_model.embed([query_filtered]))[0].tolist()
+q_d = get_dense_embeddings([query_filtered])[0]
 q_c = list(colbert_model.embed([query_filtered]))[0].tolist()
 
 gxp_filter = models.Filter(

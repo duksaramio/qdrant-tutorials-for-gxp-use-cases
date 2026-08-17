@@ -10,9 +10,9 @@ is rarely well-represented by a single vector:
 
 This tutorial demonstrates Qdrant's Multi-Representation Architecture:
 1. Ingestion: Each document chunk is a point, storing named vectors for:
-   - 'dense_chunk': Chunk-level semantic embedding
-   - 'dense_title': Document-level title semantic embedding
-   - 'dense_scope': Document-level executive scope embedding
+   - 'dense_chunk': Chunk-level semantic embedding (Ollama qwen3-embedding:8b, 4096d)
+   - 'dense_title': Document-level title semantic embedding (Ollama qwen3-embedding:8b, 4096d)
+   - 'dense_scope': Document-level executive scope embedding (Ollama qwen3-embedding:8b, 4096d)
    - 'sparse_title': Sparse BM25 title vector (with server-side IDF)
 2. Retrieval:
    - The Query API runs parallel prefetches across all four representations.
@@ -27,26 +27,35 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding, SparseTextEmbedding
+from fastembed import SparseTextEmbedding
+import ollama
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_multi_representation_docs"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant & Initialize FastEmbed Models
+# 1. Connect to Local Qdrant & Initialize Models
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-print("Initializing FastEmbed models:")
-print("  - Dense:  sentence-transformers/all-MiniLM-L6-v2 (384 dims)")
-print("  - Sparse: Qdrant/bm25 (server-side IDF enabled)")
+print("Initializing models:")
+print(f"  - Dense:  Ollama {EMBEDDING_MODEL} ({VECTOR_SIZE} dims)")
+print("  - Sparse: FastEmbed Qdrant/bm25 (server-side IDF enabled)")
 
-dense_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+
+
+def get_dense_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
 
 # ---------------------------------------------------------------------------
 # 2. Configure Multi-Representation Collection Schema
@@ -60,9 +69,9 @@ if client.collection_exists(COLLECTION_NAME):
 client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config={
-        "dense_chunk": models.VectorParams(size=384, distance=models.Distance.COSINE),
-        "dense_title": models.VectorParams(size=384, distance=models.Distance.COSINE),
-        "dense_scope": models.VectorParams(size=384, distance=models.Distance.COSINE),
+        "dense_chunk": models.VectorParams(size=VECTOR_SIZE, distance=models.Distance.COSINE),
+        "dense_title": models.VectorParams(size=VECTOR_SIZE, distance=models.Distance.COSINE),
+        "dense_scope": models.VectorParams(size=VECTOR_SIZE, distance=models.Distance.COSINE),
     },
     sparse_vectors_config={
         "sparse_title": models.SparseVectorParams(modifier=models.Modifier.IDF)
@@ -96,7 +105,7 @@ print(f"Collection '{COLLECTION_NAME}' schema created with 4 named vectors & pay
 # 3. Ingest Multi-Representation Document Chunks
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 80)
-print("Step 3: Embedding and indexing GxP document chunks...")
+print("Step 3: Embedding and indexing GxP document chunks via Ollama...")
 
 data_path = Path(__file__).resolve().parent.parent.parent / "data" / "gxp_chunked_documents.json"
 with open(data_path, "r", encoding="utf-8") as f:
@@ -107,8 +116,8 @@ point_id = 1
 
 for doc in documents:
     # Compute document-level vectors (reused across all chunks of this document)
-    dense_title_vec = list(dense_model.embed([doc["title"]]))[0].tolist()
-    dense_scope_vec = list(dense_model.embed([doc["scope"]]))[0].tolist()
+    dense_title_vec = get_dense_embeddings([doc["title"]])[0]
+    dense_scope_vec = get_dense_embeddings([doc["scope"]])[0]
     sparse_title_raw = list(sparse_model.embed([doc["title"]]))[0]
     sparse_title_vec = models.SparseVector(
         indices=sparse_title_raw.indices.tolist(),
@@ -117,14 +126,14 @@ for doc in documents:
 
     # Compute chunk-level vectors
     chunk_texts = [f"{c['section']}: {c['text']}" for c in doc["chunks"]]
-    chunk_dense_vecs = list(dense_model.embed(chunk_texts))
+    chunk_dense_vecs = get_dense_embeddings(chunk_texts)
 
     for idx, chunk in enumerate(doc["chunks"]):
         points.append(
             models.PointStruct(
                 id=point_id,
                 vector={
-                    "dense_chunk": chunk_dense_vecs[idx].tolist(),
+                    "dense_chunk": chunk_dense_vecs[idx],
                     "dense_title": dense_title_vec,
                     "dense_scope": dense_scope_vec,
                     "sparse_title": sparse_title_vec,
@@ -164,7 +173,7 @@ def retrieve_gxp_groups(
     print("=" * 80)
 
     # Generate query vectors
-    q_dense = list(dense_model.embed([query_text]))[0].tolist()
+    q_dense = get_dense_embeddings([query_text])[0]
     q_sparse_raw = list(sparse_model.embed([query_text]))[0]
     q_sparse = models.SparseVector(
         indices=q_sparse_raw.indices.tolist(),

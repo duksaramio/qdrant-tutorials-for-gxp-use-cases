@@ -28,22 +28,30 @@ import os
 from typing import Dict, Any, List
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding
+import ollama
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_dynamic_payloads"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant & Initialize FastEmbed Model
+# 1. Connect to Local Qdrant & Initialize Ollama Client
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+ollama_client = ollama.Client(host=OLLAMA_HOST)
 
-print("Initializing FastEmbed dense model (sentence-transformers/all-MiniLM-L6-v2)...")
-dense_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+print(f"Initializing Ollama model '{EMBEDDING_MODEL}' ({VECTOR_SIZE} dims)...")
+
+
+def get_embeddings(texts: list) -> list:
+    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+
 
 # ---------------------------------------------------------------------------
 # 2. Configure Collection & Fixed Payload Indexes
@@ -57,7 +65,7 @@ if client.collection_exists(COLLECTION_NAME):
 client.create_collection(
     collection_name=COLLECTION_NAME,
     vectors_config=models.VectorParams(
-        size=384,
+        size=VECTOR_SIZE,
         distance=models.Distance.COSINE,
     ),
 )
@@ -119,7 +127,7 @@ def reshape_gxp_attributes(raw_attrs: Dict[str, Any]) -> Dict[str, List]:
 # 4. Ingest Heterogeneous GxP Systems & Instrument Records
 # ---------------------------------------------------------------------------
 print("\n" + "=" * 80)
-print("Step 3: Ingesting GxP records with heterogeneous, system-specific attributes...")
+print("Step 3: Ingesting GxP records with heterogeneous, system-specific attributes via Ollama...")
 
 raw_records = [
     {
@@ -200,10 +208,12 @@ raw_records = [
     },
 ]
 
+texts = [f"{item['title']}. {item['summary']}" for item in raw_records]
+embeddings = get_embeddings(texts)
+
 points = []
 for idx, item in enumerate(raw_records):
     reshaped_attrs = reshape_gxp_attributes(item["custom_attributes"])
-    vec = list(dense_model.embed([f"{item['title']}. {item['summary']}"]))[0].tolist()
 
     payload = {
         "doc_id": item["doc_id"],
@@ -213,7 +223,7 @@ for idx, item in enumerate(raw_records):
         **reshaped_attrs,
     }
 
-    points.append(models.PointStruct(id=idx + 1, vector=vec, payload=payload))
+    points.append(models.PointStruct(id=idx + 1, vector=embeddings[idx], payload=payload))
 
 client.upload_points(collection_name=COLLECTION_NAME, points=points)
 print(f"Indexed {len(points)} points containing {len(points)} reshaped dynamic payload structures.")
@@ -300,7 +310,7 @@ query_text = "database disaster recovery and automated backup snapshot verificat
 print(f"Semantic Query: \"{query_text}\"")
 print("=" * 80)
 
-q_vec = list(dense_model.embed([query_text]))[0].tolist()
+q_vec = get_embeddings([query_text])[0]
 
 hits_semantic_filtered = client.query_points(
     collection_name=COLLECTION_NAME,

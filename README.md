@@ -1,6 +1,6 @@
 # Qdrant Vector Search Tutorials for Life Science Quality & Computer System Validation (CSV)
 
-A practical collection of vector search, hybrid retrieval, payload engineering, and multi-representation search tutorials built with [Qdrant](https://qdrant.tech/) and [Ollama](https://ollama.ai/) (`qwen3-embedding:8b`), tailored specifically for **Life Sciences Quality Assurance (QA)**, **Computer System Validation (CSV / CSA)**, and **GxP Regulatory Compliance (21 CFR Part 11 / EU Annex 11 / GAMP 5)**.
+A practical collection of vector search, hybrid retrieval, payload engineering, and multi-representation search tutorials built with [Qdrant](https://qdrant.tech/), [Ollama](https://ollama.ai/) (`qwen3-embedding:8b`), and [Langfuse](https://langfuse.com/) observability, tailored specifically for **Life Sciences Quality Assurance (QA)**, **Computer System Validation (CSV / CSA)**, and **GxP Regulatory Compliance (21 CFR Part 11 / EU Annex 11 / GAMP 5)**.
 
 ---
 
@@ -9,6 +9,7 @@ A practical collection of vector search, hybrid retrieval, payload engineering, 
 - [Overview](#overview)
 - [Why Vector & Hybrid Search in Life Science Quality & CSV?](#why-vector--hybrid-search-in-life-science-quality--csv)
 - [Architecture & Tech Stack](#architecture--tech-stack)
+- [Observability with Langfuse](#observability-with-langfuse)
 - [Repository Structure](#repository-structure)
 - [Tutorial Catalog](#tutorial-catalog)
 - [Quickstart Guide](#quickstart-guide)
@@ -33,7 +34,7 @@ Quality and Computer System Validation engineers routinely manage vast volumes o
 
 Standard lexical/keyword search fails when queries use colloquial phrasing or synonyms (e.g., searching for *"unauthorized digital record modification"* misses documents titled *"21 CFR Part 11 Audit Trail Review and E-Signature Controls"*). Conversely, pure dense vector search often struggles with specific alphanumeric document IDs (e.g., `SOP-QA-042`) and exact regulatory clause numbers (e.g., `21 CFR 11.10(e)`).
 
-This repository provides 10 comprehensive, production-ready tutorials demonstrating how to build, query, filter, fuse (RRF), scope across branches, and index dynamic payloads using **local Qdrant** and local **Ollama `qwen3-embedding:8b` (4096 dimensions)**.
+This repository provides 10 comprehensive, production-ready tutorials demonstrating how to build, query, filter, fuse (RRF), scope across branches, and index dynamic payloads using **local Qdrant**, local **Ollama `qwen3-embedding:8b` (4096 dimensions)**, and **Langfuse Observability**.
 
 ---
 
@@ -43,7 +44,18 @@ This repository provides 10 comprehensive, production-ready tutorials demonstrat
 - **Dense Embedding Engine**: Local [Ollama](https://ollama.ai/) at `http://localhost:11434` with **`qwen3-embedding:8b`** producing 4096-dimensional high-capacity semantic vectors.
 - **Sparse Lexical Engine**: FastEmbed `Qdrant/bm25` with server-side IDF modifiers for exact alphanumeric code and regulatory clause search.
 - **Late-Interaction Multi-Vector Engine**: FastEmbed `colbert-ir/colbertv2.0` (128 dims/token) with `MaxSim` comparator for token-level precision reranking.
-- **Python Tooling**: `qdrant-client`, `ollama`, `fastembed`, `python-dotenv`, `numpy`.
+- **Observability & Tracing**: [Langfuse](https://langfuse.com/) at `http://localhost:3000` for real-time tracking of embedding generations, retrieval latency, similarity scores, and multi-stage pipelines.
+- **Python Tooling**: `qdrant-client`, `ollama`, `fastembed`, `langfuse`, `python-dotenv`, `numpy`.
+
+---
+
+## 🔍 Observability with Langfuse
+
+Every tutorial is instrumented with Langfuse SDK v4 OpenTelemetry decorators:
+1. **`@observe(as_type="embedding")`**: Logs embedding model names, token counts, and vector dimensions for both dense and multivector generation.
+2. **`@observe(as_type="span")`**: Traces document ingestion batches, collection configuration, and data reshaping operations.
+3. **`@observe(as_type="retriever")`**: Logs query inputs, search filters, and top returned points with similarity and RRF fusion scores.
+4. **Trace URLs**: Every tutorial run outputs a direct clickable Langfuse Trace URL (e.g., `http://localhost:3000/project/.../traces/...`) for real-time visual inspection in the Langfuse UI.
 
 ---
 
@@ -63,7 +75,7 @@ qdrant-tutorials-for-gxp-use-cases/
 │   ├── gxp_pdf_pages.json               # Multi-page GxP validation reports, tables & FMEA matrices
 │   └── gxp_chunked_documents.json       # Multi-representation chunked GxP documents
 └── tutorials/
-    ├── 01_semantic_search_101/          # Core 101: GxP document indexing with Ollama qwen3-embedding:8b
+    ├── 01_semantic_search_101/          # Core 101: GxP document indexing with Ollama qwen3-embedding:8b & Langfuse
     │   ├── README.md
     │   └── semantic_search_101_gxp.py
     ├── 02_urs_to_oq_traceability/       # Automated Requirements Traceability Matrix (RTM) search
@@ -101,16 +113,16 @@ qdrant-tutorials-for-gxp-use-cases/
 
 | # | Tutorial | Objective | GxP Focus Area | Stack | Infrastructure |
 |---|---|---|---|---|---|
-| **01** | [Semantic Search 101](tutorials/01_semantic_search_101/README.md) | Spin up a Qdrant collection, generate 4096d dense embeddings with Ollama `qwen3-embedding:8b`, and apply GxP payload filters. | Quality Documents, CAPAs, SOPs, Deviations | Python / Ollama / Qdrant | Local (`localhost:6333` & `11434`) |
-| **02** | [URS to OQ Traceability](tutorials/02_urs_to_oq_traceability/README.md) | Automatically match User Requirements (URS) to Operational Qualification (OQ) test scripts for RTM generation. | GAMP 5, RTM, Test Verification | Python / Ollama / Qdrant | Local (`localhost:6333` & `11434`) |
-| **03** | [Regulatory Clause Mapping](tutorials/03_regulatory_clause_mapping/README.md) | Map vendor technical software controls to 21 CFR Part 11 and EU Annex 11 regulatory predicate rules. | 21 CFR Part 11, EU Annex 11, Vendor Audits | Python / Ollama / Qdrant | Local (`localhost:6333` & `11434`) |
-| **04** | [Hybrid Search (Dense + BM25)](tutorials/04_hybrid_search/README.md) | Fuse Ollama dense semantic embeddings (4096d) with BM25 sparse keyword vectors using Reciprocal Rank Fusion (RRF). | Exact GxP IDs, Citations & Conceptual Search | Python / Ollama / FastEmbed / Qdrant | Local (`localhost:6333` & `11434`) |
-| **05** | [Hybrid Search with Reranking](tutorials/05_hybrid_search_with_reranking/README.md) | 2-stage retrieval: Prefetch with Dense (Ollama) + BM25, then rerank candidates using ColBERT late-interaction multivectors. | High-Precision Compliance & Audit Retrieval | Python / Ollama / FastEmbed / ColBERT | Local (`localhost:6333` & `11434`) |
-| **06** | [Multivectors & Late Interaction](tutorials/06_multivectors_and_late_interaction/README.md) | Optimize RAM & compute with token-level ColBERT multivectors using `hnsw_config=HnswConfigDiff(m=0)` and Ollama dense prefetch. | Long Complex Protocols, Risk Assessments, URS | Python / Ollama / FastEmbed / Qdrant | Local (`localhost:6333` & `11434`) |
-| **07** | [Multivector Document Retrieval](tutorials/07_multivector_document_retrieval/README.md) | Scale multi-page PDF validation document retrieval using mean-pooled multivector prefetch and MaxSim reranking. | Multi-Page Validation Reports, FMEA Tables, CoAs | Python / FastEmbed / NumPy | Local (`localhost:6333`) |
-| **08** | [Multi-Representation Search](tutorials/08_multi_representation_search/README.md) | Fuse Title, Scope, and Chunk dense vectors (Ollama 4096d) via RRF and group by `document_id` for document-level presentation. | Granular Section Grounding in SOPs, Protocols & CAPAs | Python / Ollama / FastEmbed / Qdrant | Local (`localhost:6333` & `11434`) |
-| **09** | [Branch-Aware Search](tutorials/09_branch_aware_search/README.md) | Index versioned GxP documents with Ollama vectors and scope queries strictly to a branch's live view (Effective baselines, Change Control drafts, Site overlays). | Document Lifecycles, Change Control Revisions, EDMS | Python / Ollama / Qdrant | Local (`localhost:6333` & `11434`) |
-| **10** | [Dynamic Payload Indexing](tutorials/10_indexing_dynamic_payloads/README.md) | Reshape open-ended instrument/system attributes into typed EAV arrays to query numeric ranges and exact matches with fixed indexes. | Instrument Telemetry, System Parameters, Multi-Lab Logs | Python / Ollama / Qdrant | Local (`localhost:6333` & `11434`) |
+| **01** | [Semantic Search 101](tutorials/01_semantic_search_101/README.md) | Spin up a Qdrant collection, generate 4096d dense embeddings with Ollama `qwen3-embedding:8b`, and trace retrieval with Langfuse. | Quality Documents, CAPAs, SOPs, Deviations | Python / Ollama / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **02** | [URS to OQ Traceability](tutorials/02_urs_to_oq_traceability/README.md) | Automatically match User Requirements (URS) to Operational Qualification (OQ) test scripts for RTM generation. | GAMP 5, RTM, Test Verification | Python / Ollama / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **03** | [Regulatory Clause Mapping](tutorials/03_regulatory_clause_mapping/README.md) | Map vendor technical software controls to 21 CFR Part 11 and EU Annex 11 regulatory predicate rules. | 21 CFR Part 11, EU Annex 11, Vendor Audits | Python / Ollama / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **04** | [Hybrid Search (Dense + BM25)](tutorials/04_hybrid_search/README.md) | Fuse Ollama dense semantic embeddings (4096d) with BM25 sparse keyword vectors using Reciprocal Rank Fusion (RRF). | Exact GxP IDs, Citations & Conceptual Search | Python / Ollama / FastEmbed / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **05** | [Hybrid Search with Reranking](tutorials/05_hybrid_search_with_reranking/README.md) | 2-stage retrieval: Prefetch with Dense (Ollama) + BM25, then rerank candidates using ColBERT late-interaction multivectors. | High-Precision Compliance & Audit Retrieval | Python / Ollama / FastEmbed / ColBERT / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **06** | [Multivectors & Late Interaction](tutorials/06_multivectors_and_late_interaction/README.md) | Optimize RAM & compute with token-level ColBERT multivectors using `hnsw_config=HnswConfigDiff(m=0)` and Ollama dense prefetch. | Long Complex Protocols, Risk Assessments, URS | Python / Ollama / FastEmbed / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **07** | [Multivector Document Retrieval](tutorials/07_multivector_document_retrieval/README.md) | Scale multi-page PDF validation document retrieval using mean-pooled multivector prefetch and MaxSim reranking. | Multi-Page Validation Reports, FMEA Tables, CoAs | Python / FastEmbed / NumPy / Langfuse | Local (`localhost:6333`, `3000`) |
+| **08** | [Multi-Representation Search](tutorials/08_multi_representation_search/README.md) | Fuse Title, Scope, and Chunk dense vectors (Ollama 4096d) via RRF and group by `document_id` for document-level presentation. | Granular Section Grounding in SOPs, Protocols & CAPAs | Python / Ollama / FastEmbed / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **09** | [Branch-Aware Search](tutorials/09_branch_aware_search/README.md) | Index versioned GxP documents with Ollama vectors and scope queries strictly to a branch's live view (Effective baselines, Change Control drafts, Site overlays). | Document Lifecycles, Change Control Revisions, EDMS | Python / Ollama / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
+| **10** | [Dynamic Payload Indexing](tutorials/10_indexing_dynamic_payloads/README.md) | Reshape open-ended instrument/system attributes into typed EAV arrays to query numeric ranges and exact matches with fixed indexes. | Instrument Telemetry, System Parameters, Multi-Lab Logs | Python / Ollama / Qdrant / Langfuse | Local (`localhost:6333`, `11434`, `3000`) |
 
 ---
 
@@ -124,6 +136,10 @@ qdrant-tutorials-for-gxp-use-cases/
 2. **Local Ollama with `qwen3-embedding:8b`**:
    ```bash
    ollama pull qwen3-embedding:8b
+   ```
+3. **Local Langfuse Server**:
+   ```bash
+   # Running on http://localhost:3000
    ```
 
 ### Installation
@@ -156,6 +172,9 @@ Default configuration targets:
 QDRANT_URL=http://localhost:6333
 OLLAMA_HOST=http://localhost:11434
 EMBEDDING_MODEL=qwen3-embedding:8b
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=http://localhost:3000
 ```
 
 ### Running Tutorials
@@ -200,8 +219,9 @@ When implementing vector and hybrid search solutions in regulated life science e
 
 1. **Deterministic Embeddings**: Pin embedding model names (`qwen3-embedding:8b`), local Ollama versions, and model weights to guarantee reproducible vector generation across validation lifecycles.
 2. **Data Integrity & ALCOA+**: Store document IDs, cryptographic hashes, version numbers, and approval timestamps in point payloads to ensure end-to-end lineage.
-3. **Access Controls (21 CFR Part 11 & EU Annex 11)**: Utilize Qdrant Cloud Role-Based Access Control (RBAC) and JSON Web Tokens (JWT) to enforce segregation of duties between QA reviewers, system owners, and validation leads.
-4. **Disaster Recovery & Backup Verification**: Validate automated snapshot creation (`client.create_snapshot`) and test restoration procedures periodically to satisfy CSV disaster recovery requirements.
+3. **Traceability & Audit Readiness (21 CFR Part 11 / Annex 11)**: Every vector query, score calculation, and candidate ranking can be audited and reproduced via Langfuse trace logs.
+4. **Access Controls**: Utilize Qdrant Cloud Role-Based Access Control (RBAC) and JSON Web Tokens (JWT) to enforce segregation of duties between QA reviewers, system owners, and validation leads.
+5. **Disaster Recovery & Backup Verification**: Validate automated snapshot creation (`client.create_snapshot`) and test restoration procedures periodically to satisfy CSV disaster recovery requirements.
 
 ---
 

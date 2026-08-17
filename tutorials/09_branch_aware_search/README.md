@@ -1,6 +1,6 @@
 # Tutorial 09: Branch-Aware Search Over Versioned GxP & CSV Document Lifecycles
 
-| Time: 25–35 min | Level: Intermediate | Infrastructure: Local Qdrant (`http://localhost:6333`) + Local Ollama (`qwen3-embedding:8b`) |
+| Time: 25–35 min | Level: Intermediate | Infrastructure: Local Qdrant (`http://localhost:6333`) + Local Ollama (`qwen3-embedding:8b`) + Langfuse (`http://localhost:3000`) |
 | :--- | :--- | :--- |
 
 ## Overview
@@ -10,33 +10,15 @@ In Life Science Quality Management Systems (QMS / EDMS) and Computer System Vali
 - **`draft-cc-2024`:** Proposed draft revisions under Change Control (CC) review.
 - **`site-eu-overlay`:** Regional manufacturing site overlays (incorporating local EU GMP Annex 11 / Qualified Person requirements).
 
-### The Cross-Branch Leakage Problem
-In standard vector search, an index query leaks across versions:
-- An auditor querying `main-effective` might inadvertently retrieve unapproved draft text from `draft-cc-2024`.
-- A validation engineer working on `draft-cc-2024` might miss files inherited from the parent branch or see changes made on `main` *after* the fork cutoff.
-
-This tutorial demonstrates how to index a versioned GxP corpus in **Local Qdrant (`http://localhost:6333`)** with **Ollama (`qwen3-embedding:8b`, 4096-dim)** and scope each vector query strictly to a single branch's live view:
-1. Its own commits and revisions.
-2. What it inherited from its ancestors up to the fork point (`seq <= fork_seq`).
-3. Zero content that a later commit superseded or deleted.
+This tutorial demonstrates how to index a versioned GxP corpus in **Local Qdrant (`http://localhost:6333`)** with **Ollama (`qwen3-embedding:8b`, 4096-dim)** and scope each vector query strictly to a single branch's live view, monitored via **Langfuse** at `http://localhost:3000`.
 
 ---
 
-## 🏗️ Architecture: Branch Ancestry & Cutoff Filter
+## 🔍 Observability with Langfuse
 
-```text
-main-effective   ●──────●──────●──────●     seq 0-3 (v1.0 -> v2.0 -> delete -> v2.0 OQ)
-                        │             │
-                        │             └── site-eu-overlay ●  (forked @ seq 3)
-                        │
-                        └── draft-cc-2024 ●──────●           (forked @ seq 2)
-```
-
-Each point stores:
-- `path`: Document identifier (`SOP-QA-042.md`).
-- `branch`: Branch name (`main-effective`, `draft-cc-2024`, `site-eu-overlay`).
-- `seq`: Integer commit sequence index.
-- `overwritten_in`: Nested array `[{"by": "draft-cc-2024", "seq": 1}]` tracking superseded history.
+- **`@observe(as_type="embedding")`**: Traces dense embeddings generated for versioned document updates and semantic search queries.
+- **`@observe(as_type="span")`**: Traces commit updates and supersede history tracking.
+- **`@observe(as_type="retriever")`**: Traces branch exact lookups and branch-scoped vector search queries.
 
 ---
 

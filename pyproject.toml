@@ -1,23 +1,16 @@
 [project]
 name = "qdrant-tutorials-for-gxp-use-cases"
 version = "0.1.0"
-description = "Qdrant vector search tutorials tailored for Life Sciences Quality, CSV, GxP, and 21 CFR Part 11 use cases"
+description = "Qdrant Vector Search Tutorials for Life Science Quality Assurance, CSV, and GxP Compliance"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "qdrant-client>=1.11.0",
-    "fastembed>=0.4.0",
+    "qdrant-client>=1.12.0",
     "ollama>=0.6.0",
-    "python-dotenv>=1.0.1",
+    "fastembed>=0.4.0",
+    "langfuse>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "numpy>=1.26.0",
     "tabulate>=0.9.0",
+    "tqdm>=4.66.0",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "jupyterlab>=4.0.0",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"

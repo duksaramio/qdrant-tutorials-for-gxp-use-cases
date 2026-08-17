@@ -16,6 +16,8 @@ This tutorial demonstrates Qdrant's optimized 2-stage architecture:
 2. Retrieval:
    - Stage 1 (Fast Recall): Prefetch top candidate pages using HNSW-indexed 'mean_pooled' vectors
    - Stage 2 (Fine-Grained Precision): Rerank candidates with 'original' multivector MaxSim
+3. Observability:
+   - Full Langfuse trace telemetry at http://localhost:3000
 
 Target Environment: Local Qdrant server at http://localhost:6333
 """
@@ -27,21 +29,36 @@ import numpy as np
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
 from fastembed import LateInteractionTextEmbedding
+from langfuse import get_client, observe
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
 COLLECTION_NAME = "gxp_pdf_pages_demo"
 
 # ---------------------------------------------------------------------------
-# 1. Connect to Local Qdrant Server & Initialize ColBERT Model
+# 1. Connect to Local Qdrant Server & Initialize ColBERT Model & Langfuse
 # ---------------------------------------------------------------------------
 print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
+langfuse = get_client()
 
 print("Initializing ColBERT Late-Interaction model (colbert-ir/colbertv2.0)...")
+print(f"Langfuse Observability connected at: {LANGFUSE_HOST}")
 colbert_model = LateInteractionTextEmbedding(model_name="colbert-ir/colbertv2.0")
+
+
+@observe(as_type="embedding", name="colbert-multivector-embedding")
+def embed_colbert(texts: list) -> list:
+    embeddings = list(colbert_model.embed(texts))
+    langfuse.update_current_generation(
+        model="colbert-ir/colbertv2.0",
+        metadata={"text_count": len(texts), "type": "late_interaction_multivector"},
+    )
+    return embeddings
+
 
 # ---------------------------------------------------------------------------
 # 2. Configure 2-Stage Multi-Vector Collection (Mean-Pooled + Original)
@@ -97,42 +114,52 @@ def mean_pool_multivector(vectors: np.ndarray, num_pooled_chunks: int = 4) -> np
 # ---------------------------------------------------------------------------
 # 4. Ingest Multi-Page GxP Documents
 # ---------------------------------------------------------------------------
+@observe(as_type="span", name="ingest-pdf-pages-multivectors")
+def ingest_pages():
+    data_path = Path(__file__).resolve().parent.parent.parent / "data" / "gxp_pdf_pages.json"
+    with open(data_path, "r", encoding="utf-8") as f:
+        pages = json.load(f)
+
+    page_texts = [
+        f"Document: {p['doc_title']} (Page {p['page_number']}). Section: {p['section_title']}. Content: {p['content']}"
+        for p in pages
+    ]
+
+    raw_colbert_embeddings = embed_colbert(page_texts)
+
+    points = []
+    for idx, page in enumerate(pages):
+        full_multivector = raw_colbert_embeddings[idx]  # shape: [num_tokens, 128]
+        pooled_multivector = mean_pool_multivector(full_multivector, num_pooled_chunks=4)
+
+        point = models.PointStruct(
+            id=idx + 1,
+            payload=page,
+            vector={
+                "original": full_multivector.tolist(),
+                "mean_pooled": pooled_multivector.tolist(),
+            },
+        )
+        points.append(point)
+
+    client.upload_points(collection_name=COLLECTION_NAME, points=points)
+    langfuse.update_current_span(
+        output={"indexed_pages": len(points), "collection": COLLECTION_NAME},
+        metadata={"source": data_path.name},
+    )
+    return len(points)
+
+
 print("\n" + "=" * 80)
 print("Step 3: Embedding and mean-pooling GxP PDF page records...")
-
-data_path = Path(__file__).resolve().parent.parent.parent / "data" / "gxp_pdf_pages.json"
-with open(data_path, "r", encoding="utf-8") as f:
-    pages = json.load(f)
-
-page_texts = [
-    f"Document: {p['doc_title']} (Page {p['page_number']}). Section: {p['section_title']}. Content: {p['content']}"
-    for p in pages
-]
-
-raw_colbert_embeddings = list(colbert_model.embed(page_texts))
-
-points = []
-for idx, page in enumerate(pages):
-    full_multivector = raw_colbert_embeddings[idx]  # shape: [num_tokens, 128]
-    pooled_multivector = mean_pool_multivector(full_multivector, num_pooled_chunks=4)
-
-    point = models.PointStruct(
-        id=idx + 1,
-        payload=page,
-        vector={
-            "original": full_multivector.tolist(),
-            "mean_pooled": pooled_multivector.tolist(),
-        },
-    )
-    points.append(point)
-
-client.upload_points(collection_name=COLLECTION_NAME, points=points)
-print(f"Indexed {len(points)} GxP document pages with dual multivector configurations.")
+page_count = ingest_pages()
+print(f"Indexed {page_count} GxP document pages with dual multivector configurations.")
 
 
 # ---------------------------------------------------------------------------
 # 5. Execute Optimized Two-Stage Multivector Retrieval
 # ---------------------------------------------------------------------------
+@observe(as_type="retriever", name="twostage-meanpooled-colbert-search")
 def run_twostage_document_search(query_text: str, gxp_filter: models.Filter = None):
     print("\n" + "=" * 80)
     print(f"AUDIT / CSV QUERY: \"{query_text}\"")
@@ -141,7 +168,7 @@ def run_twostage_document_search(query_text: str, gxp_filter: models.Filter = No
     print("=" * 80)
 
     # 1. Embed query with ColBERT
-    q_full = list(colbert_model.embed([query_text]))[0]  # shape: [q_tokens, 128]
+    q_full = embed_colbert([query_text])[0]  # shape: [q_tokens, 128]
     q_pooled = mean_pool_multivector(q_full, num_pooled_chunks=2)
 
     # 2. Stage 1 (Fast Candidate Prefetch via Mean-Pooled HNSW)
@@ -172,35 +199,50 @@ def run_twostage_document_search(query_text: str, gxp_filter: models.Filter = No
         print(f"      Layout Elements: {', '.join(p['layout_elements'])}")
         print(f"      Content: {p['content'][:110]}...\n")
 
+    langfuse.update_current_span(
+        input={"query": query_text, "filter_active": gxp_filter is not None},
+        output=[{"page_id": h.payload["page_id"], "score": h.score, "title": h.payload["doc_title"]} for h in results],
+    )
+    return results
+
 
 # ---------------------------------------------------------------------------
 # 6. Test Scenario Queries
 # ---------------------------------------------------------------------------
+@observe(name="tutorial-07-document-retrieval-pipeline")
+def execute_document_scenarios():
+    # Scenario 1: Analytical validation - Peak integration & baseline resolution formula
+    run_twostage_document_search(
+        "chromatographic peak integration algorithm verification acceptance criteria and retention time repeatability"
+    )
 
-# Scenario 1: Analytical validation - Peak integration & baseline resolution formula
-run_twostage_document_search(
-    "chromatographic peak integration algorithm verification acceptance criteria and retention time repeatability"
-)
+    # Scenario 2: Technical root cause investigation - Modbus buffer overrun diagnostics
+    run_twostage_document_search(
+        "root cause analysis of Modbus communication packet buffer overrun on bioreactor DO transmitter"
+    )
 
-# Scenario 2: Technical root cause investigation - Modbus buffer overrun diagnostics
-run_twostage_document_search(
-    "root cause analysis of Modbus communication packet buffer overrun on bioreactor DO transmitter"
-)
+    # Scenario 3: FMEA Risk Mitigation - Electronic signature key compromise
+    run_twostage_document_search(
+        "mitigation controls for electronic signature private key compromise in cloud EDMS"
+    )
 
-# Scenario 3: FMEA Risk Mitigation - Electronic signature key compromise
-run_twostage_document_search(
-    "mitigation controls for electronic signature private key compromise in cloud EDMS"
-)
+    # Scenario 4: Filtered search - only Validation Protocols
+    prot_filter = models.Filter(
+        must=[models.FieldCondition(key="doc_type", match=models.MatchValue(value="Validation Protocol"))]
+    )
+    run_twostage_document_search(
+        "raw data deletion resistance and immutable audit log verification steps",
+        gxp_filter=prot_filter,
+    )
 
-# Scenario 4: Filtered search - only Validation Protocols
-prot_filter = models.Filter(
-    must=[models.FieldCondition(key="doc_type", match=models.MatchValue(value="Validation Protocol"))]
-)
-run_twostage_document_search(
-    "raw data deletion resistance and immutable audit log verification steps",
-    gxp_filter=prot_filter,
-)
+    return langfuse.get_trace_url()
+
+
+trace_url = execute_document_scenarios()
+langfuse.flush()
 
 print("=" * 80)
 print("Tutorial 07 Execution Complete!")
+if trace_url:
+    print(f"Langfuse Trace URL: {trace_url}")
 print("=" * 80)

@@ -9,7 +9,10 @@ Architecture:
 2. Retrieval:
    - Prefetch candidate pool using Dense (Ollama) + BM25 Sparse search (high recall)
    - Rerank prefetched candidates using ColBERT late interaction multi-vector (high precision)
-3. Target Environment: Local Qdrant server at http://localhost:6333
+3. Observability:
+   - Langfuse (http://localhost:3000) full multi-stage trace monitoring
+
+Target Environment: Local Qdrant server at http://localhost:6333
 """
 
 import json
@@ -19,12 +22,14 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
 from fastembed import SparseTextEmbedding, LateInteractionTextEmbedding
 import ollama
+from langfuse import get_client, observe
 
 load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "http://localhost:3000")
 VECTOR_SIZE = 4096
 COLLECTION_NAME = "gxp_hybrid_reranking_docs"
 
@@ -35,18 +40,46 @@ print("=" * 80)
 print(f"Step 1: Connecting to Qdrant at {QDRANT_URL}...")
 client = QdrantClient(url=QDRANT_URL)
 ollama_client = ollama.Client(host=OLLAMA_HOST)
+langfuse = get_client()
 
 print("Initializing 3 embedding models locally:")
 print(f"  [1] Dense:            Ollama {EMBEDDING_MODEL} ({VECTOR_SIZE} dims)")
 print("  [2] Sparse:           FastEmbed Qdrant/bm25 (IDF modifier enabled)")
 print("  [3] Late Interaction: FastEmbed colbert-ir/colbertv2.0 (128 dims/token, MaxSim)")
+print(f"  [4] Observability:    Langfuse ({LANGFUSE_HOST})")
 
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 colbert_model = LateInteractionTextEmbedding(model_name="colbert-ir/colbertv2.0")
 
 
+@observe(as_type="embedding", name="ollama-qwen3-dense-embedding")
 def get_dense_embeddings(texts: list) -> list:
-    return ollama_client.embed(model=EMBEDDING_MODEL, input=texts).embeddings
+    response = ollama_client.embed(model=EMBEDDING_MODEL, input=texts)
+    langfuse.update_current_generation(
+        model=EMBEDDING_MODEL,
+        metadata={"text_count": len(texts), "dimensions": VECTOR_SIZE},
+    )
+    return response.embeddings
+
+
+@observe(as_type="embedding", name="fastembed-bm25-sparse-embedding")
+def get_sparse_embeddings(texts: list) -> list:
+    embeddings = list(sparse_model.embed(texts))
+    langfuse.update_current_generation(
+        model="Qdrant/bm25",
+        metadata={"text_count": len(texts), "type": "sparse_lexical"},
+    )
+    return embeddings
+
+
+@observe(as_type="embedding", name="fastembed-colbert-multivector-embedding")
+def get_colbert_embeddings(texts: list) -> list:
+    embeddings = list(colbert_model.embed(texts))
+    langfuse.update_current_generation(
+        model="colbert-ir/colbertv2.0",
+        metadata={"text_count": len(texts), "type": "late_interaction_multivector", "dims_per_token": 128},
+    )
+    return embeddings
 
 
 # ---------------------------------------------------------------------------
@@ -83,42 +116,52 @@ print(f"Collection '{COLLECTION_NAME}' created successfully.")
 # ---------------------------------------------------------------------------
 # 3. Ingest GxP Quality & Validation Documents
 # ---------------------------------------------------------------------------
+@observe(as_type="span", name="ingest-3way-vectors")
+def ingest_documents():
+    data_path = Path(__file__).resolve().parent.parent.parent / "data" / "gxp_quality_docs.json"
+    with open(data_path, "r", encoding="utf-8") as f:
+        documents = json.load(f)
+
+    texts = [f"{doc['title']}. {doc['description']}" for doc in documents]
+
+    dense_embeddings = get_dense_embeddings(texts)
+    sparse_embeddings = get_sparse_embeddings(texts)
+    colbert_embeddings = get_colbert_embeddings(texts)
+
+    points = []
+    for idx, doc in enumerate(documents):
+        s_vec = sparse_embeddings[idx]
+        point = models.PointStruct(
+            id=idx + 1,
+            payload=doc,
+            vector={
+                "dense": dense_embeddings[idx],
+                "sparse": models.SparseVector(
+                    indices=s_vec.indices.tolist(),
+                    values=s_vec.values.tolist(),
+                ),
+                "multi": colbert_embeddings[idx].tolist(),
+            },
+        )
+        points.append(point)
+
+    client.upload_points(collection_name=COLLECTION_NAME, points=points)
+    langfuse.update_current_span(
+        output={"indexed_count": len(points), "collection": COLLECTION_NAME},
+        metadata={"source": data_path.name},
+    )
+    return len(points)
+
+
 print("\n" + "=" * 80)
 print("Step 3: Generating 3-way vector embeddings and uploading documents...")
-
-data_path = Path(__file__).resolve().parent.parent.parent / "data" / "gxp_quality_docs.json"
-with open(data_path, "r", encoding="utf-8") as f:
-    documents = json.load(f)
-
-texts = [f"{doc['title']}. {doc['description']}" for doc in documents]
-
-dense_embeddings = get_dense_embeddings(texts)
-sparse_embeddings = list(sparse_model.embed(texts))
-colbert_embeddings = list(colbert_model.embed(texts))
-
-points = []
-for idx, doc in enumerate(documents):
-    s_vec = sparse_embeddings[idx]
-    point = models.PointStruct(
-        id=idx + 1,
-        payload=doc,
-        vector={
-            "dense": dense_embeddings[idx],
-            "sparse": models.SparseVector(
-                indices=s_vec.indices.tolist(),
-                values=s_vec.values.tolist(),
-            ),
-            "multi": colbert_embeddings[idx].tolist(),
-        },
-    )
-    points.append(point)
-
-client.upload_points(collection_name=COLLECTION_NAME, points=points)
-print(f"Successfully uploaded {len(points)} documents with Dense (Ollama), BM25, and ColBERT vectors.")
+count = ingest_documents()
+print(f"Successfully uploaded {count} documents with Dense (Ollama), BM25, and ColBERT vectors.")
 
 # ---------------------------------------------------------------------------
 # 4. Pipeline Execution: Dense vs. BM25 vs. Hybrid RRF vs. Late Interaction Reranking
 # ---------------------------------------------------------------------------
+@observe(as_type="retriever", name="hybrid-and-colbert-rerank")
 def run_retrieval_and_reranking(query_text: str):
     print("\n" + "=" * 80)
     print(f"USER QUERY: \"{query_text}\"")
@@ -126,8 +169,8 @@ def run_retrieval_and_reranking(query_text: str):
 
     # Generate query vectors for all 3 models
     q_dense = get_dense_embeddings([query_text])[0]
-    q_sparse = list(sparse_model.embed([query_text]))[0]
-    q_colbert = list(colbert_model.embed([query_text]))[0].tolist()
+    q_sparse = get_sparse_embeddings([query_text])[0]
+    q_colbert = get_colbert_embeddings([query_text])[0].tolist()
 
     sparse_obj = models.SparseVector(
         indices=q_sparse.indices.tolist(),
@@ -192,16 +235,37 @@ def run_retrieval_and_reranking(query_text: str):
         print(f"      System: {h.payload['system']} | Type: {h.payload['doc_type']}")
         print(f"      Summary: {h.payload['description'][:110]}...")
 
+    langfuse.update_current_span(
+        input={"query": query_text},
+        output={
+            "dense_top": [{"id": h.payload["doc_id"], "score": h.score} for h in dense_res],
+            "sparse_top": [{"id": h.payload["doc_id"], "score": h.score} for h in sparse_res],
+            "rrf_top": [{"id": h.payload["doc_id"], "score": h.score} for h in rrf_res],
+            "colbert_reranked": [{"id": h.payload["doc_id"], "score": h.score} for h in rerank_res],
+        },
+    )
+    return rerank_res
+
 
 # ---------------------------------------------------------------------------
 # 5. Test Queries
 # ---------------------------------------------------------------------------
-# Query 1: Data integrity and periodic audit log inspection
-run_retrieval_and_reranking("regulatory compliance for immutable time-stamped audit trail review")
+@observe(name="tutorial-05-reranking-pipeline")
+def execute_reranking_scenarios():
+    # Query 1: Data integrity and periodic audit log inspection
+    run_retrieval_and_reranking("regulatory compliance for immutable time-stamped audit trail review")
 
-# Query 2: System resilience & backup validation
-run_retrieval_and_reranking("periodic database backup snapshot failures and disaster recovery restoration drill")
+    # Query 2: System resilience & backup validation
+    run_retrieval_and_reranking("periodic database backup snapshot failures and disaster recovery restoration drill")
+
+    return langfuse.get_trace_url()
+
+
+trace_url = execute_reranking_scenarios()
+langfuse.flush()
 
 print("\n" + "=" * 80)
 print("Tutorial 05 Execution Complete!")
+if trace_url:
+    print(f"Langfuse Trace URL: {trace_url}")
 print("=" * 80)

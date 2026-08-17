@@ -1,48 +1,27 @@
 # Tutorial 10: Indexing Payloads of Random Shape (Dynamic Attributes) for GxP & CSV
 
-| Time: 25–35 min | Level: Intermediate | Infrastructure: Local Qdrant (`http://localhost:6333`) + Local Ollama (`qwen3-embedding:8b`) |
+| Time: 25–35 min | Level: Intermediate / Advanced | Infrastructure: Local Qdrant (`http://localhost:6333`) + Local Ollama (`qwen3-embedding:8b`) + Langfuse (`http://localhost:3000`) |
 | :--- | :--- | :--- |
 
 ## Overview
 
-In Life Science Quality (QMS) and Computer System Validation (CSV / GAMP 5), computerized systems across analytical QC labs, manufacturing suites, clinical trials, and cloud infrastructure produce **thousands of open-ended, system-specific telemetry and qualification attributes**:
-- **Analytical CDS (Empower / ChemStation):** `flow_rate_ml_min`, `column_temp_c`, `detector_type`, `rsd_retention_time_pct`
-- **Bioreactor MES / SCADA (DeltaV):** `dissolved_oxygen_pct`, `agitation_rpm`, `vessel_pressure_psi`, `feed_rate_l_hr`
-- **Cloud EDMS (Documentum / Veeva):** `ectd_module`, `hsm_fips_level`, `ind_number`, `soc2_type_ii_certified`
-- **IT Disaster Recovery:** `rto_hours`, `rpo_minutes`, `database_engine`, `backup_storage_tier`
+In Life Science Quality (QMS) and Computer System Validation (CSV / GAMP 5), computerized systems across analytical QC labs, manufacturing suites, and cloud platforms generate thousands of open-ended, system-specific telemetry and qualification attributes.
+
+Creating a separate payload index for every distinct incoming attribute causes severe index bloat and high memory overhead.
+
+### The Entity-Attribute-Value (EAV) Solution:
+1. **Reshape Dynamic Attributes** into typed EAV arrays (`attrs`, `attrs_num`, `attrs_bool`, `attrs_flat`).
+2. **Fixed Indexes:** Build only 8 fixed payload indexes that cover an infinite number of dynamic attributes.
+3. **Multi-Attribute Filter Queries:** Execute exact keyword matches, numerical range queries, and hybrid semantic searches against dynamic attributes.
+4. **Langfuse Observability:** Monitor dynamic payload queries and filter evaluations in **Langfuse** at `http://localhost:3000`.
 
 ---
 
-## ⚠️ The One-Index-Per-Key Trap
+## 🔍 Observability with Langfuse
 
-The naive approach is to create a new Qdrant payload index every time a new attribute key arrives:
-
-```python
-# Anti-pattern: Creating one payload index per distinct incoming attribute key
-for key in incoming_telemetry_keys:
-    client.create_payload_index(collection_name="gxp_data", field_name=key, field_schema=models.PayloadSchemaType.KEYWORD)
-```
-
-As the key space expands to hundreds or thousands of unique instrument attributes, RAM usage and index build times explode.
-
----
-
-## 💡 The Solution: Entity-Attribute-Value (EAV) Reshaping
-
-Instead of storing arbitrary key names at the top-level payload, reshape dynamic attributes into **fixed, typed key-value arrays**:
-
-```text
-{ "flow_rate_ml_min": 1.25, "detector": "UV-Vis", "is_gxp": True }
-                        ↓  Reshape before Ingestion
-{
-  "attrs":      [ {"key": "detector", "value": "UV-Vis"} ],
-  "attrs_num":  [ {"key": "flow_rate_ml_min", "value": 1.25} ],
-  "attrs_bool": [ {"key": "is_gxp", "value": True} ],
-  "attrs_flat": [ "detector=UV-Vis", "flow_rate_ml_min=1.25", "is_gxp=True" ]
-}
-```
-
-This reduces the total index count to a **fixed set of 8 payload indexes** that never grows, regardless of how many new instruments, telemetry channels, or systems are added.
+- **`@observe(as_type="embedding")`**: Traces dense embeddings (Ollama 4096d) generated for dynamic payload summaries.
+- **`@observe(as_type="span")`**: Traces the dynamic attribute reshaping and point batch indexing phase.
+- **`@observe(as_type="retriever")`**: Traces exact categorical filters, numerical range lookups, and hybrid semantic search queries with DR bounds.
 
 ---
 

@@ -1,6 +1,6 @@
 # Qdrant Vector Search Tutorials for Life Science Quality & Computer System Validation (CSV)
 
-A practical collection of vector search, hybrid retrieval, and multi-representation search tutorials built with [Qdrant](https://qdrant.tech/), tailored specifically for **Life Sciences Quality Assurance (QA)**, **Computer System Validation (CSV / CSA)**, and **GxP Regulatory Compliance (21 CFR Part 11 / EU Annex 11 / GAMP 5)**.
+A practical collection of vector search, hybrid retrieval, and payload engineering tutorials built with [Qdrant](https://qdrant.tech/), tailored specifically for **Life Sciences Quality Assurance (QA)**, **Computer System Validation (CSV / CSA)**, and **GxP Regulatory Compliance (21 CFR Part 11 / EU Annex 11 / GAMP 5)**.
 
 ---
 
@@ -30,9 +30,9 @@ Quality and Computer System Validation engineers routinely manage vast volumes o
 - Change Controls (CC / CR)
 - System Risk Assessments (SRA / FMEA) and Audit Findings
 
-Standard lexical/keyword search fails when queries use colloquial phrasing or synonyms (e.g., searching for *"unauthorized digital record modification"* misses documents titled *"21 CFR Part 11 Audit Trail Review and E-Signature Controls"*). Conversely, pure dense vector search often struggles with specific alphanumeric document IDs (e.g., `SOP-QA-042`) and exact regulatory clause numbers (e.g., `21 CFR 11.10(e)`). Furthermore, regulated documents evolve across versioned lifecycles (Effective baselines, Change Control drafts, Regional site overlays) where searches must be strictly branch-aware with zero data leakage.
+Standard lexical/keyword search fails when queries use colloquial phrasing or synonyms (e.g., searching for *"unauthorized digital record modification"* misses documents titled *"21 CFR Part 11 Audit Trail Review and E-Signature Controls"*). Conversely, pure dense vector search often struggles with specific alphanumeric document IDs (e.g., `SOP-QA-042`) and exact regulatory clause numbers (e.g., `21 CFR 11.10(e)`). Furthermore, enterprise computerized systems produce thousands of heterogeneous, open-ended telemetry and qualification attributes that require specialized payload indexing to prevent RAM bloat.
 
-This repository provides hands-on tutorials showing how to build, query, filter, fuse (RRF), and scope vector search pipelines across versioned lifecycles using local Qdrant.
+This repository provides hands-on tutorials showing how to build, query, filter, fuse (RRF), scope across branches, and index dynamic payloads using local Qdrant.
 
 ---
 
@@ -76,9 +76,12 @@ qdrant-tutorials-for-gxp-use-cases/
     ├── 08_multi_representation_search/       # Multi-Representation Search (Title + Scope + Chunk) with Grouping
     │   ├── README.md
     │   └── multi_representation_search_gxp.py
-    └── 09_branch_aware_search/               # Branch-Aware Search Over Versioned Document Lifecycles & Change Controls
+    ├── 09_branch_aware_search/               # Branch-Aware Search Over Versioned Document Lifecycles & Change Controls
+    │   ├── README.md
+    │   └── branch_aware_search_gxp.py
+    └── 10_indexing_dynamic_payloads/         # Indexing Dynamic/Open-Ended Attributes with Typed EAV Arrays & Nested Filters
         ├── README.md
-        └── branch_aware_search_gxp.py
+        └── indexing_dynamic_payloads_gxp.py
 ```
 
 ---
@@ -96,6 +99,7 @@ qdrant-tutorials-for-gxp-use-cases/
 | **07** | [Multivector Document Retrieval](tutorials/07_multivector_document_retrieval/README.md) | Scale multi-page PDF validation document retrieval using mean-pooled multivector prefetch and MaxSim reranking. | Multi-Page Validation Reports, FMEA Tables, CoAs | Python / FastEmbed / NumPy | Local (`http://localhost:6333`) |
 | **08** | [Multi-Representation Search](tutorials/08_multi_representation_search/README.md) | Fuse Title, Scope, and Chunk vectors via RRF and group by `document_id` for document-level presentation with chunk grounding. | Granular Section Grounding in SOPs, Protocols & CAPAs | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
 | **09** | [Branch-Aware Search](tutorials/09_branch_aware_search/README.md) | Index versioned GxP documents and scope queries strictly to a branch's live view (Effective baselines, Change Control drafts, Site overlays). | Document Lifecycles, Change Control Revisions, EDMS | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
+| **10** | [Dynamic Payload Indexing](tutorials/10_indexing_dynamic_payloads/README.md) | Reshape open-ended instrument/system attributes into typed EAV arrays to query numeric ranges and exact matches with fixed indexes. | Instrument Telemetry, System Parameters, Multi-Lab Logs | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
 
 ---
 
@@ -164,6 +168,9 @@ python tutorials/08_multi_representation_search/multi_representation_search_gxp.
 
 # Tutorial 9: Branch-Aware Search Over Versioned GxP Lifecycles & Change Controls (Local Qdrant)
 python tutorials/09_branch_aware_search/branch_aware_search_gxp.py
+
+# Tutorial 10: Indexing Dynamic Payloads with Typed EAV Arrays & Nested Filters (Local Qdrant)
+python tutorials/10_indexing_dynamic_payloads/indexing_dynamic_payloads_gxp.py
 ```
 
 ---

@@ -1,0 +1,38 @@
+[
+  {
+    "clause_id": "21 CFR 11.10(a)",
+    "title": "Validation of Systems",
+    "regulation": "21 CFR Part 11",
+    "section_text": "Validation of systems to ensure accuracy, reliability, consistent intended performance, and the ability to discern invalid or altered records."
+  },
+  {
+    "clause_id": "21 CFR 11.10(b)",
+    "title": "Protection and Accurate Retrieval of Records",
+    "regulation": "21 CFR Part 11",
+    "section_text": "The ability to generate accurate and complete copies of records in both human readable and electronic form suitable for inspection, review, and copying by the agency."
+  },
+  {
+    "clause_id": "21 CFR 11.10(e)",
+    "title": "Time-Stamped Audit Trails",
+    "regulation": "21 CFR Part 11",
+    "section_text": "Use of secure, computer-generated, time-stamped audit trails to independently record the date and time of operator entries and actions that create, modify, or delete electronic records."
+  },
+  {
+    "clause_id": "21 CFR 11.50",
+    "title": "Signature Manifestations",
+    "regulation": "21 CFR Part 11",
+    "section_text": "Signed electronic records shall contain information associated with the signing that clearly indicates the printed name of the signer, the date and time when the signature was executed, and the meaning associated with the signature."
+  },
+  {
+    "clause_id": "EU Annex 11.9",
+    "title": "Audit Trails",
+    "regulation": "EU GMP Annex 11",
+    "section_text": "Consideration should be given, based on a risk assessment, to building into the system the creation of a record of all GMP-relevant changes and deletions (a system generated 'audit trail'). For change or deletion of GMP-relevant data the reason should be documented."
+  },
+  {
+    "clause_id": "EU Annex 11.7",
+    "title": "Data Storage and Backup",
+    "regulation": "EU GMP Annex 11",
+    "section_text": "Regular back-ups of all relevant data should be taken. Integrity and accuracy of backup data and the ability to restore the data should be checked during validation and monitored periodically."
+  }
+]

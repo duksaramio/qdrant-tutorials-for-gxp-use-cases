@@ -1,0 +1,65 @@
+{
+  "user_requirements": [
+    {
+      "req_id": "URS-SEC-01",
+      "category": "Security & Access",
+      "statement": "The system shall automatically lock active user sessions after 15 minutes of user inactivity.",
+      "gxp_criticality": "High"
+    },
+    {
+      "req_id": "URS-AUD-02",
+      "category": "Audit Trail",
+      "statement": "The system shall record an immutable time-stamped audit trail for any create, modify, or delete action on analytical batch records, capturing user ID, timestamp, old value, and new value.",
+      "gxp_criticality": "Critical"
+    },
+    {
+      "req_id": "URS-SIG-03",
+      "category": "Electronic Signature",
+      "statement": "Electronic signatures must require two distinct identification components (User ID and Password) for non-continuous signing sessions and print the reason for signing.",
+      "gxp_criticality": "Critical"
+    },
+    {
+      "req_id": "URS-BKP-04",
+      "category": "Data Backup & Recovery",
+      "statement": "The system shall perform automated daily incremental backups and weekly full backups with automated checksum verification.",
+      "gxp_criticality": "Medium"
+    }
+  ],
+  "oq_test_scripts": [
+    {
+      "test_id": "OQ-SCR-101",
+      "test_title": "Session Inactivity Time-out Challenge",
+      "module": "Authentication",
+      "steps": "Login as an Analyst user. Leave session idle on the sample run screen for 15 minutes. Verify modal warning displays at 14 minutes and system automatically logs out at 15:01, requiring re-authentication.",
+      "expected_result": "Session is terminated and no unsaved changes are committed without authentication."
+    },
+    {
+      "test_id": "OQ-SCR-204",
+      "test_title": "Batch Result Modification Audit Trail Verification",
+      "module": "Audit Trail",
+      "steps": "Open approved batch record #8841. Modify moisture content from 2.4% to 2.5%. Enter required change reason. Inspect audit trail table. Verify old value 2.4%, new value 2.5%, timestamp in UTC, and analyst credentials are logged.",
+      "expected_result": "Immutable audit record created; database record cannot be overwritten without audit entry."
+    },
+    {
+      "test_id": "OQ-SCR-305",
+      "test_title": "E-Signature Two-Factor Prompt & Manifestation Test",
+      "module": "Electronic Signatures",
+      "steps": "Attempt to approve deviation report DEV-001. Enter password only. Verify system requires both username and password. Enter signature meaning 'Approval of Technical Content'. Verify PDF export manifests printed name, date, time, and meaning.",
+      "expected_result": "Dual-credential challenge enforced and signature manifestation conforms to 21 CFR Part 11.50."
+    },
+    {
+      "test_id": "OQ-SCR-402",
+      "test_title": "Scheduled Snapshot and Checksum Validation",
+      "module": "Infrastructure & Backup",
+      "steps": "Trigger automated cron backup task. Verify snapshot creation in S3 bucket. Compute SHA-256 hash of source database volume vs backup archive. Execute mock restore to test instance.",
+      "expected_result": "Backup archive integrity verified via SHA-256 matching and mock database restoration succeeds."
+    },
+    {
+      "test_id": "OQ-SCR-501",
+      "test_title": "Role-Based Data Segregation & Permission Matrix",
+      "module": "Authorization",
+      "steps": "Log in with Read-Only Auditor role. Attempt to delete chromatographic method. Verify 'Delete' button is disabled and API call returns 403 Forbidden.",
+      "expected_result": "Unauthorized actions are blocked per RBAC matrix."
+    }
+  ]
+}

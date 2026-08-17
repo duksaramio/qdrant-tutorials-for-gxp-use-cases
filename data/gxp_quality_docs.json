@@ -1,0 +1,132 @@
+[
+  {
+    "doc_id": "SOP-QA-042",
+    "title": "Electronic Records, Signatures, and Audit Trail Review",
+    "doc_type": "SOP",
+    "system": "Enterprise QMS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2024,
+    "description": "Establishes requirements for ensuring 21 CFR Part 11 and EU Annex 11 compliance, covering electronic signature verification, immutable audit trail generation, and periodic review of critical data modifications."
+  },
+  {
+    "doc_id": "VAL-OQ-108",
+    "title": "Chromatography Data System (CDS) Operational Qualification Protocol",
+    "doc_type": "Validation Protocol",
+    "system": "Empower CDS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2023,
+    "description": "OQ test scripts verifying chromatographic peak integration algorithms, access privilege tiers, electronic raw data archiving, and automated system lock-out after inactivity."
+  },
+  {
+    "doc_id": "DEV-2024-031",
+    "title": "Deviation Investigation: Discrepancy in Bioreactor Dissolved Oxygen Logging",
+    "doc_type": "Deviation",
+    "system": "SCADA / DeltaV MES",
+    "gamp_category": "Category 5 (Custom)",
+    "gxp_impact": "Direct",
+    "effective_year": 2024,
+    "description": "Root cause analysis of intermittent communication dropouts between bioreactor probe sensors and the SCADA server during commercial batch fermentation runs."
+  },
+  {
+    "doc_id": "CAPA-2023-019",
+    "title": "CAPA: Remediation of Inadequate Automated Backup Verification in LIMS",
+    "doc_type": "CAPA",
+    "system": "LabVantage LIMS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2023,
+    "description": "Corrective and preventive action plan addressing automated database snapshot failures, disaster recovery RTO/RPO validation, and quarterly restoration drill schedules."
+  },
+  {
+    "doc_id": "VAL-URS-015",
+    "title": "User Requirements Specification for Clinical Trial Management System",
+    "doc_type": "URS",
+    "system": "Veeva CTMS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2025,
+    "description": "User and functional specifications for subject randomization, electronic informed consent tracking, GCP compliance, and automated adverse event reporting to safety databases."
+  },
+  {
+    "doc_id": "SRA-IT-008",
+    "title": "System Risk Assessment for Cloud-Hosted Electronic Document Management",
+    "doc_type": "Risk Assessment",
+    "system": "Documentum EDMS",
+    "gamp_category": "Category 3 (Non-Configured SaaS)",
+    "gxp_impact": "Indirect",
+    "effective_year": 2022,
+    "description": "FMEA-based risk assessment analyzing data loss, multi-tenant data segregation, SOC 2 vendor qualification, and electronic signature integrity for regulatory submission files."
+  },
+  {
+    "doc_id": "CR-2024-112",
+    "title": "Change Control: Operating System Patching and Database Upgrade for MES",
+    "doc_type": "Change Control",
+    "system": "Syncade MES",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2024,
+    "description": "Impact assessment and regression validation test plan for applying security hotfixes and upgrading the underlying Oracle database supporting electronic batch records (eBR)."
+  },
+  {
+    "doc_id": "AUD-2023-004",
+    "title": "Internal Audit Finding: Lack of Periodic Account Deprovisioning Review",
+    "doc_type": "Audit Finding",
+    "system": "Enterprise Active Directory",
+    "gamp_category": "Category 1 (Infrastructure)",
+    "gxp_impact": "Indirect",
+    "effective_year": 2023,
+    "description": "Identified terminated contractor accounts remaining active in validated laboratory systems past the 24-hour notification window required by global computer security SOPs."
+  },
+  {
+    "doc_id": "VAL-PQ-202",
+    "title": "Performance Qualification Protocol for Temperature-Controlled Warehouse BMS",
+    "doc_type": "Validation Protocol",
+    "system": "Siemens BMS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2021,
+    "description": "Seasonal mapping protocols and PQ challenge tests for cold chain storage (+2°C to +8°C) monitoring, alarm notification escalations, and power outage failover validation."
+  },
+  {
+    "doc_id": "SOP-CSV-001",
+    "title": "Computer Software Assurance (CSA) and Lifecycle Validation Methodology",
+    "doc_type": "SOP",
+    "system": "Corporate Quality",
+    "gamp_category": "Category 1-5 General",
+    "gxp_impact": "Direct",
+    "effective_year": 2025,
+    "description": "Defines risk-based computerized system validation lifecycle, critical quality attribute (CQA) assessment, scripted vs unscripted testing, and continuous verification principles under GAMP 5 2nd Edition."
+  },
+  {
+    "doc_id": "DEV-2023-094",
+    "title": "Deviation Investigation: LIMS Sample Status Inconsistency After Network Interruption",
+    "doc_type": "Deviation",
+    "system": "LabVantage LIMS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2023,
+    "description": "Investigation into stability test sample status flags reverting to 'In-Progress' after high-performance liquid chromatography batch upload was interrupted by network latency."
+  },
+  {
+    "doc_id": "CAPA-2024-005",
+    "title": "CAPA: Inadequate Multi-Factor Authentication Configuration for Remote Lab Access",
+    "doc_type": "CAPA",
+    "system": "Enterprise VPN / CDS",
+    "gamp_category": "Category 1 (Infrastructure)",
+    "gxp_impact": "Direct",
+    "effective_year": 2024,
+    "description": "Action plan to enforce hardware token MFA across all remote QC analytical instrument workstations following an external data integrity audit observation."
+  },
+  {
+    "doc_id": "VAL-IQ-050",
+    "title": "Installation Qualification Protocol for Enterprise Quality Management System",
+    "doc_type": "Validation Protocol",
+    "system": "TrackWise Digital QMS",
+    "gamp_category": "Category 4 (Configured)",
+    "gxp_impact": "Direct",
+    "effective_year": 2024,
+    "description": "IQ verification of server prerequisites, TLS 1.3 cryptographic cipher configurations, database schema installation scripts, and third-party software dependencies."
+  }
+]

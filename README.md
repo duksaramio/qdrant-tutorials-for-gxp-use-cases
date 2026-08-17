@@ -32,7 +32,7 @@ Quality and Computer System Validation engineers routinely manage vast volumes o
 
 Standard lexical/keyword search fails when queries use colloquial phrasing or synonyms (e.g., searching for *"unauthorized digital record modification"* misses documents titled *"21 CFR Part 11 Audit Trail Review and E-Signature Controls"*). Conversely, pure dense vector search often struggles with specific alphanumeric document IDs (e.g., `SOP-QA-042`) and exact regulatory clause numbers (e.g., `21 CFR 11.10(e)`).
 
-This repository provides hands-on tutorials showing how to build, query, filter, fuse (RRF), and rerank (ColBERT late interaction) search pipelines using local Qdrant.
+This repository provides hands-on tutorials showing how to build, query, filter, fuse (RRF), and rescore with token-level multivectors (ColBERT MaxSim) using local Qdrant.
 
 ---
 
@@ -62,9 +62,12 @@ qdrant-tutorials-for-gxp-use-cases/
     ├── 04_hybrid_search/                # Dense + BM25 Sparse Hybrid Search with RRF on Local Qdrant
     │   ├── README.md
     │   └── hybrid_search_gxp.py
-    └── 05_hybrid_search_with_reranking/ # Hybrid Search + ColBERT Late-Interaction MaxSim Reranking
+    ├── 05_hybrid_search_with_reranking/ # Hybrid Search + ColBERT Late-Interaction MaxSim Reranking
+    │   ├── README.md
+    │   └── hybrid_search_reranking_gxp.py
+    └── 06_multivectors_and_late_interaction/ # Token-Level Multivectors (ColBERT) with HNSW m=0 Optimization
         ├── README.md
-        └── hybrid_search_reranking_gxp.py
+        └── multivectors_late_interaction_gxp.py
 ```
 
 ---
@@ -78,6 +81,7 @@ qdrant-tutorials-for-gxp-use-cases/
 | **03** | [Regulatory Clause Mapping](tutorials/03_regulatory_clause_mapping/README.md) | Map vendor technical software controls to 21 CFR Part 11 and EU Annex 11 regulatory predicate rules. | 21 CFR Part 11, EU Annex 11, Vendor Audits | Python / Qdrant Client | In-Memory / Local |
 | **04** | [Hybrid Search (Dense + BM25)](tutorials/04_hybrid_search/README.md) | Fuse dense semantic embeddings with BM25 sparse keyword vectors using Reciprocal Rank Fusion (RRF). | Exact GxP IDs, Citations & Conceptual Search | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
 | **05** | [Hybrid Search with Reranking](tutorials/05_hybrid_search_with_reranking/README.md) | 2-stage retrieval: Prefetch with Dense + BM25, then rerank candidates using ColBERT late-interaction multivectors. | High-Precision Compliance & Audit Retrieval | Python / FastEmbed / ColBERT | Local (`http://localhost:6333`) |
+| **06** | [Multivectors & Late Interaction](tutorials/06_multivectors_and_late_interaction/README.md) | Optimize RAM & compute with token-level ColBERT multivectors using `hnsw_config=HnswConfigDiff(m=0)`. | Long Complex Protocols, Risk Assessments, URS | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
 
 ---
 
@@ -134,6 +138,9 @@ python tutorials/04_hybrid_search/hybrid_search_gxp.py
 
 # Tutorial 5: Hybrid Search with ColBERT Late-Interaction Reranking (Local Qdrant)
 python tutorials/05_hybrid_search_with_reranking/hybrid_search_reranking_gxp.py
+
+# Tutorial 6: Multivector Representations & Late Interaction with HNSW m=0 (Local Qdrant)
+python tutorials/06_multivectors_and_late_interaction/multivectors_late_interaction_gxp.py
 ```
 
 ---

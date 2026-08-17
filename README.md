@@ -1,6 +1,6 @@
 # Qdrant Vector Search Tutorials for Life Science Quality & Computer System Validation (CSV)
 
-A practical collection of vector search and hybrid retrieval tutorials built with [Qdrant](https://qdrant.tech/), tailored specifically for **Life Sciences Quality Assurance (QA)**, **Computer System Validation (CSV / CSA)**, and **GxP Regulatory Compliance (21 CFR Part 11 / EU Annex 11 / GAMP 5)**.
+A practical collection of vector search, hybrid retrieval, and multi-vector reranking tutorials built with [Qdrant](https://qdrant.tech/), tailored specifically for **Life Sciences Quality Assurance (QA)**, **Computer System Validation (CSV / CSA)**, and **GxP Regulatory Compliance (21 CFR Part 11 / EU Annex 11 / GAMP 5)**.
 
 ---
 
@@ -32,7 +32,7 @@ Quality and Computer System Validation engineers routinely manage vast volumes o
 
 Standard lexical/keyword search fails when queries use colloquial phrasing or synonyms (e.g., searching for *"unauthorized digital record modification"* misses documents titled *"21 CFR Part 11 Audit Trail Review and E-Signature Controls"*). Conversely, pure dense vector search often struggles with specific alphanumeric document IDs (e.g., `SOP-QA-042`) and exact regulatory clause numbers (e.g., `21 CFR 11.10(e)`).
 
-This repository provides hands-on tutorials showing how to build, query, filter, and fuse dense semantic search with sparse BM25 keyword search using Qdrant.
+This repository provides hands-on tutorials showing how to build, query, filter, fuse (RRF), and rerank (ColBERT late interaction) search pipelines using local Qdrant.
 
 ---
 
@@ -59,9 +59,12 @@ qdrant-tutorials-for-gxp-use-cases/
     ├── 03_regulatory_clause_mapping/    # 21 CFR Part 11 & EU Annex 11 compliance clause matching
     │   ├── README.md
     │   └── part11_clause_mapping.py
-    └── 04_hybrid_search/                # Dense + BM25 Sparse Hybrid Search with RRF on Local Qdrant
+    ├── 04_hybrid_search/                # Dense + BM25 Sparse Hybrid Search with RRF on Local Qdrant
+    │   ├── README.md
+    │   └── hybrid_search_gxp.py
+    └── 05_hybrid_search_with_reranking/ # Hybrid Search + ColBERT Late-Interaction MaxSim Reranking
         ├── README.md
-        └── hybrid_search_gxp.py
+        └── hybrid_search_reranking_gxp.py
 ```
 
 ---
@@ -73,7 +76,8 @@ qdrant-tutorials-for-gxp-use-cases/
 | **01** | [Semantic Search 101](tutorials/01_semantic_search_101/README.md) | Spin up a Qdrant collection, upload GxP quality & CSV records, run semantic queries, and apply payload filters. | Quality Documents, CAPAs, SOPs, Deviations | Python / Qdrant Client | In-Memory / Cloud |
 | **02** | [URS to OQ Traceability](tutorials/02_urs_to_oq_traceability/README.md) | Automatically match User Requirements (URS) to Operational Qualification (OQ) test scripts for RTM generation. | GAMP 5, RTM, Test Verification | Python / Qdrant Client | In-Memory / Local |
 | **03** | [Regulatory Clause Mapping](tutorials/03_regulatory_clause_mapping/README.md) | Map vendor technical software controls to 21 CFR Part 11 and EU Annex 11 regulatory predicate rules. | 21 CFR Part 11, EU Annex 11, Vendor Audits | Python / Qdrant Client | In-Memory / Local |
-| **04** | [Hybrid Search (Dense + BM25)](tutorials/04_hybrid_search/README.md) | Fuse dense semantic embeddings with BM25 sparse keyword vectors using Reciprocal Rank Fusion (RRF) on local Qdrant. | Exact GxP IDs, Citations & Conceptual Search | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
+| **04** | [Hybrid Search (Dense + BM25)](tutorials/04_hybrid_search/README.md) | Fuse dense semantic embeddings with BM25 sparse keyword vectors using Reciprocal Rank Fusion (RRF). | Exact GxP IDs, Citations & Conceptual Search | Python / FastEmbed / Qdrant | Local (`http://localhost:6333`) |
+| **05** | [Hybrid Search with Reranking](tutorials/05_hybrid_search_with_reranking/README.md) | 2-stage retrieval: Prefetch with Dense + BM25, then rerank candidates using ColBERT late-interaction multivectors. | High-Precision Compliance & Audit Retrieval | Python / FastEmbed / ColBERT | Local (`http://localhost:6333`) |
 
 ---
 
@@ -127,6 +131,9 @@ python tutorials/03_regulatory_clause_mapping/part11_clause_mapping.py
 
 # Tutorial 4: Dense + BM25 Sparse Hybrid Search with RRF (Local Qdrant)
 python tutorials/04_hybrid_search/hybrid_search_gxp.py
+
+# Tutorial 5: Hybrid Search with ColBERT Late-Interaction Reranking (Local Qdrant)
+python tutorials/05_hybrid_search_with_reranking/hybrid_search_reranking_gxp.py
 ```
 
 ---

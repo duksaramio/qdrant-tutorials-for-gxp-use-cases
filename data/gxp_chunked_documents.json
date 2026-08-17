@@ -1,0 +1,132 @@
+[
+  {
+    "doc_id": "SOP-QA-042",
+    "title": "SOP-QA-042: Electronic Records, Signatures, and Audit Trail Review",
+    "scope": "Defines corporate standards for ensuring 21 CFR Part 11 and EU GMP Annex 11 compliance across all computerized laboratory and manufacturing systems, mandating immutable audit logging and role-based access control.",
+    "doc_type": "SOP",
+    "system": "Enterprise QMS",
+    "gamp_category": "Category 4",
+    "tags": ["21 CFR Part 11", "Annex 11", "Audit Trail", "Electronic Signature", "Data Integrity"],
+    "chunks": [
+      {
+        "chunk_id": "SOP-QA-042_C01",
+        "section": "Section 3.0: Responsibilities and Roles",
+        "text": "Quality Assurance (QA) is responsible for conducting independent periodic reviews of computerized system audit trails prior to commercial batch release. System Administrators are prohibited from modifying or disabling audit trail capture functions."
+      },
+      {
+        "chunk_id": "SOP-QA-042_C02",
+        "section": "Section 4.1: Audit Trail Generation and Review Procedures",
+        "text": "Audit trails must record the date, time in UTC, operator unique user ID, previous value, new value, and mandatory reason for change for all critical GxP data modifications. Audit logs must be archived in an immutable, append-only repository."
+      },
+      {
+        "chunk_id": "SOP-QA-042_C03",
+        "section": "Section 5.2: Electronic Signature Manifestation Controls",
+        "text": "Electronic signatures must require dual-factor authentication (username and password) for initial signing and include printed full name, date/time stamp, and the legally binding meaning of the signature (e.g., Author, Reviewer, Approver)."
+      }
+    ]
+  },
+  {
+    "doc_id": "VAL-OQ-108",
+    "title": "VAL-OQ-108: Waters Empower 3 Chromatography Data System (CDS) OQ Protocol",
+    "scope": "Operational Qualification protocol for Waters Empower 3 CDS controlling analytical HPLC/GC instruments in QC Release Laboratories, testing peak integration, security privileges, and raw spectral archiving.",
+    "doc_type": "Validation Protocol",
+    "system": "Empower CDS",
+    "gamp_category": "Category 4",
+    "tags": ["Chromatography", "HPLC", "OQ Protocol", "Peak Integration", "Empower CDS"],
+    "chunks": [
+      {
+        "chunk_id": "VAL-OQ-108_C01",
+        "section": "Test Script 2.1: Access Privilege Tier Verification",
+        "text": "Verify role-based access privilege matrix. Confirm QC Analyst role cannot delete chromatographic projects, modify system integration parameters, or alter instrument calibration baselines."
+      },
+      {
+        "chunk_id": "VAL-OQ-108_C02",
+        "section": "Test Script 3.4: Automated Peak Integration & Baseline Resolution",
+        "text": "Challenge the ApexTrack peak detection algorithm using complex co-eluting chemical standards. Verify peak baseline resolution, tailing factor calculations, and retention time repeatability with RSD < 0.50% across 6 replicates."
+      },
+      {
+        "chunk_id": "VAL-OQ-108_C03",
+        "section": "Test Script 4.2: Raw Data Archiving & Sequence Abort Handling",
+        "text": "Simulate abrupt network loss and sequence abort during active chromatographic acquisition. Confirm raw spectral data is buffered locally, checksum verified upon reconnection, and flagged in the audit log without data corruption."
+      }
+    ]
+  },
+  {
+    "doc_id": "DEV-2024-031",
+    "title": "DEV-2024-031: Deviation Investigation - Bioreactor DO Sensor Logging Dropout",
+    "scope": "Investigation into intermittent communication dropouts between bioreactor dissolved oxygen probes and the DeltaV SCADA server during commercial batch fermentation run #B-2024-09.",
+    "doc_type": "Deviation",
+    "system": "DeltaV SCADA / MES",
+    "gamp_category": "Category 5",
+    "tags": ["Deviation", "SCADA", "MES", "Bioreactor", "Modbus", "Data Dropout"],
+    "chunks": [
+      {
+        "chunk_id": "DEV-2024-031_C01",
+        "section": "Section 1.0: Event Summary and Initial Impact",
+        "text": "During commercial batch fermentation run #B-2024-09, dissolved oxygen readings flatlined for 14 minutes. The Emerson DeltaV SCADA system lost polling telemetry from probe transmitter DO-501."
+      },
+      {
+        "chunk_id": "DEV-2024-031_C02",
+        "section": "Section 2.3: Modbus Protocol Diagnostics and Root Cause Analysis",
+        "text": "Modbus TCP/IP packet trace revealed an RS-485 transceiver buffer overrun caused by excessive broadcast traffic on the manufacturing VLAN, causing the gateway controller to drop telemetry packets."
+      },
+      {
+        "chunk_id": "DEV-2024-031_C03",
+        "section": "Section 3.1: Product Critical Quality Attribute (CQA) Impact Disposition",
+        "text": "Offline manual metabolite sampling and continuous agitation logs confirmed dissolved oxygen remained above the critical threshold (>30% saturation). No impact to drug substance potency or glycosylation profile."
+      }
+    ]
+  },
+  {
+    "doc_id": "CAPA-2023-019",
+    "title": "CAPA-2023-019: Automated Database Backup Remediation and DR Validation in LIMS",
+    "scope": "Corrective and preventive action plan addressing automated database snapshot failures in LabVantage LIMS, establishing RTO < 4h, RPO < 15m, and quarterly disaster recovery drills.",
+    "doc_type": "CAPA",
+    "system": "LabVantage LIMS",
+    "gamp_category": "Category 4",
+    "tags": ["CAPA", "LIMS", "Disaster Recovery", "Backup", "Oracle RMAN"],
+    "chunks": [
+      {
+        "chunk_id": "CAPA-2023-019_C01",
+        "section": "Action Item 1: Automated Oracle RMAN Snapshot Implementation",
+        "text": "Reconfigure automated daily incremental and weekly full database backups using Oracle RMAN with automated SHA-256 checksum verification and Amazon S3 cross-region replication."
+      },
+      {
+        "chunk_id": "CAPA-2023-019_C02",
+        "section": "Action Item 2: Disaster Recovery RTO & RPO Qualification Protocol",
+        "text": "Execute formal validation protocol establishing Recovery Time Objective (RTO) under 4 hours and Recovery Point Objective (RPO) under 15 minutes in accordance with EU Annex 11.7 requirements."
+      },
+      {
+        "chunk_id": "CAPA-2023-019_C03",
+        "section": "Action Item 3: Quarterly Disaster Recovery Drill Schedule",
+        "text": "Establish standard operating procedure requiring unannounced quarterly mock database restoration drills to an isolated validation staging environment with mandatory QA sign-off."
+      }
+    ]
+  },
+  {
+    "doc_id": "SRA-GAMP-012",
+    "title": "SRA-GAMP-012: GAMP 5 Category 4 Cloud EDMS System Risk Assessment",
+    "scope": "FMEA-based System Risk Assessment for cloud-hosted Electronic Document Management System (Documentum EDMS) supporting regulatory IND/NDA submissions, evaluating patient safety and data integrity risks.",
+    "doc_type": "Risk Assessment",
+    "system": "Documentum EDMS",
+    "gamp_category": "Category 4",
+    "tags": ["Risk Assessment", "FMEA", "EDMS", "GAMP 5", "Cloud Security"],
+    "chunks": [
+      {
+        "chunk_id": "SRA-GAMP-012_C01",
+        "section": "Hazard 01: Multi-Tenant Data Segregation Failure",
+        "text": "Risk analysis for unauthorized cross-tenant data access in multi-tenant SaaS environment. Severity = Critical (8), Occurrence = Rare (1), Detectability = High (2). RPN = 16. Mitigation: Enforce AWS KMS dedicated customer-managed encryption keys."
+      },
+      {
+        "chunk_id": "SRA-GAMP-012_C02",
+        "section": "Hazard 04: Electronic Signature Key Compromise",
+        "text": "Risk analysis for compromised digital signing certificates. Severity = Critical (9), Occurrence = Low (2), Detectability = High (2). RPN = 36. Mitigation: Store private keys in FIPS 140-2 Level 3 Hardware Security Modules (HSM)."
+      },
+      {
+        "chunk_id": "SRA-GAMP-012_C03",
+        "section": "Hazard 07: Unrecorded Administrative Record Alterations",
+        "text": "Risk analysis for database administrators modifying document metadata outside application audit trail. Severity = Critical (9), Occurrence = Low (2), Detectability = High (1). RPN = 18. Mitigation: Enable immutable database change-data-capture (CDC) triggers."
+      }
+    ]
+  }
+]
